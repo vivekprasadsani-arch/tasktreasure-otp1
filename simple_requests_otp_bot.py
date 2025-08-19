@@ -65,9 +65,35 @@ class SimpleRequestsOTPBot:
                 logger.error(f"❌ Login page failed: {response.status_code}")
                 return False
             
-            # Parse the page for captcha
+            # Parse the page for form and captcha
             soup = BeautifulSoup(response.text, 'html.parser')
             logger.info(f"Login page title: {soup.title.string if soup.title else 'No title'}")
+            
+            # Find the login form
+            form = soup.find('form')
+            if not form:
+                logger.error("❌ No form found on login page")
+                return False
+            
+            # Get form action and method
+            form_action = form.get('action', '')
+            form_method = form.get('method', 'post').lower()
+            logger.info(f"Form action: {form_action}, method: {form_method}")
+            
+            # Collect all form fields
+            login_data = {}
+            for input_field in form.find_all(['input', 'select', 'textarea']):
+                field_name = input_field.get('name')
+                field_type = input_field.get('type', 'text')
+                field_value = input_field.get('value', '')
+                
+                if field_name:
+                    login_data[field_name] = field_value
+                    logger.info(f"Found form field: {field_name} = '{field_value}' (type: {field_type})")
+            
+            # Override with our credentials
+            login_data['username'] = self.username
+            login_data['password'] = self.password
             
             # Solve captcha - try multiple approaches
             captcha_answer = ""
@@ -91,20 +117,23 @@ class SimpleRequestsOTPBot:
                     captcha_answer = str(int(nums[0]) + int(nums[1]))
                     logger.info(f"✅ Captcha found in page: {nums[0]} + {nums[1]} = {captcha_answer}")
             
-            if not captcha_answer:
+            if captcha_answer:
+                login_data['capt'] = captcha_answer
+            else:
                 logger.warning("⚠️ No captcha found, proceeding without it")
             
-            # Prepare login data
-            login_data = {
-                'username': self.username,
-                'password': self.password,
-                'capt': captcha_answer
+            # Add common form headers
+            headers = {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Referer': self.login_url,
+                'Origin': 'http://94.23.120.156'
             }
             
             # Submit login
             login_response = self.session.post(
                 self.login_url, 
-                data=login_data, 
+                data=login_data,
+                headers=headers,
                 timeout=30,
                 allow_redirects=True
             )
