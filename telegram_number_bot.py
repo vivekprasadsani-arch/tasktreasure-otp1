@@ -10,6 +10,7 @@ import json
 import asyncio
 import logging
 import re
+import pandas as pd
 from typing import Dict, List, Optional, Set
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -82,8 +83,8 @@ class TelegramNumberBot:
             
             self.available_countries = []
             for file in os.listdir(self.countries_dir):
-                if file.endswith('.csv'):
-                    country_name = file.replace('.csv', '')
+                if file.endswith('.xlsx'):
+                    country_name = file.replace('.xlsx', '')
                     self.available_countries.append(country_name)
                     logger.info(f"📂 Found country: {country_name}")
             
@@ -247,20 +248,25 @@ class TelegramNumberBot:
             return []
     
     def get_country_numbers(self, country: str) -> List[str]:
-        """Get all numbers from a country CSV file"""
+        """Get all numbers from a country XLSX file"""
         try:
-            csv_file = os.path.join(self.countries_dir, f"{country}.csv")
+            xlsx_file = os.path.join(self.countries_dir, f"{country}.xlsx")
             numbers = []
             
-            with open(csv_file, 'r', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader)  # Skip header
-                for row in reader:
-                    if row and len(row) > 0:
-                        # Handle scientific notation in CSV
-                        number = str(row[0]).replace('.', '').split('E')[0]
-                        if len(number) > 5:  # Valid phone number length
-                            numbers.append(number)
+            # Read Excel file using pandas
+            df = pd.read_excel(xlsx_file)
+            
+            # Get first column (assuming phone numbers are in first column)
+            for value in df.iloc[:, 0]:
+                if pd.notna(value):  # Skip NaN values
+                    # Convert to string and handle scientific notation
+                    number = str(int(float(value))) if str(value).replace('.', '').replace('e', '').replace('+', '').replace('-', '').isdigit() else str(value)
+                    
+                    # Clean the number (remove any non-digit characters except +)
+                    clean_number = ''.join(c for c in number if c.isdigit() or c == '+')
+                    
+                    if len(clean_number) > 5:  # Valid phone number length
+                        numbers.append(clean_number)
             
             logger.info(f"📞 Loaded {len(numbers)} numbers for {country}")
             return numbers
@@ -448,7 +454,8 @@ Hi {user_name}! 👋
         
         await query.edit_message_text(
             message_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
         
         # Save session to database
@@ -579,7 +586,7 @@ Hi {user_name}! 👋
 💡 **Tip:** OTP codes are delivered instantly and tracked automatically!
 """
         
-        await update.message.reply_text(status_message)
+        await update.message.reply_text(status_message, parse_mode='Markdown')
     
     async def show_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help information"""

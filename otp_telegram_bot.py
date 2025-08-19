@@ -869,34 +869,59 @@ Powered by @tasktreasur\\_support"""
             logger.error(f"Error sending to Telegram: {e}")
             return False
     
+    async def background_relogin(self):
+        """Perform re-login in background without blocking main monitoring"""
+        try:
+            logger.info("🔐 Background re-login starting...")
+            
+            # Quick page refresh first
+            try:
+                self.page = await self.browser.new_page(
+                    user_agent='Mozilla/5.0 (Linux x86_64) AppleWebKit/537.36'
+                )
+                self.page.set_default_timeout(15000)
+                
+                # Fast login sequence
+                await self.page.goto(self.login_url, wait_until='load', timeout=15000)
+                await self.page.fill('input[name="username"]', self.username)
+                await self.page.fill('input[name="password"]', self.password)  
+                await self.page.click('input[type="submit"]')
+                await asyncio.sleep(2)
+                
+                logger.info("✅ Background re-login successful")
+                
+            except Exception as login_error:
+                logger.error(f"❌ Background re-login failed: {login_error}")
+                
+        except Exception as e:
+            logger.error(f"❌ Background re-login error: {e}")
+    
     async def check_for_new_messages(self) -> list:
         """Check for new SMS messages on the website - WITH SESSION RECOVERY"""
         async with self.navigation_lock:  # Prevent concurrent navigation
             try:
-                # Try to navigate with retry mechanism
-                for attempt in range(3):
+                # Single fast navigation attempt
+                try:
+                    logger.info("🚀 Fast navigation...")
+                    await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=20000)
+                    logger.info("✅ Navigation successful")
+                except Exception as nav_error:
+                    logger.warning(f"⚠️ Navigation failed: {nav_error}")
+                    
+                    # Quick session refresh attempt
                     try:
-                        logger.info(f"Navigation attempt {attempt + 1}/3")
-                        await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=40000)
-                        break
-                    except Exception as nav_error:
-                        logger.warning(f"Navigation attempt {attempt + 1} failed: {nav_error}")
-                        if attempt == 2:  # Last attempt - force re-login
-                            logger.warning("All 3 navigation attempts failed, forcing re-login...")
-                            try:
-                                # Force browser restart and re-login
-                                logger.info("Restarting browser and re-logging in...")
-                                if await self.restart_browser():
-                                    logger.info("Browser restarted successfully, attempting final navigation...")
-                                    await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=45000)
-                                    break
-                                else:
-                                    logger.error("Browser restart failed")
-                                    return []
-                            except Exception as recovery_error:
-                                logger.error(f"Recovery login failed: {recovery_error}")
-                                return []
-                        await asyncio.sleep(2)  # Wait before retry
+                        logger.info("🔄 Quick refresh attempt...")
+                        await self.page.reload(wait_until='domcontentloaded', timeout=15000)
+                        logger.info("✅ Refresh successful")
+                    except Exception as refresh_error:
+                        logger.warning(f"⚠️ Refresh failed: {refresh_error}")
+                        
+                        # Background re-login (don't block current check)
+                        logger.info("🔐 Starting background re-login...")
+                        asyncio.create_task(self.background_relogin())
+                        
+                        # Return empty for this round, but continue monitoring
+                        return []
                 
                 # Minimal wait for table to appear
                 await asyncio.sleep(1)
@@ -1044,8 +1069,8 @@ Powered by @tasktreasur\\_support"""
                             await self.restart_browser()
                             browser_restart_count = 0
                     
-                    # Small delay for instant response (1 second for better stability)
-                    await asyncio.sleep(1.0)
+                    # Fast monitoring - reduced delay for 10-second response time
+                    await asyncio.sleep(0.5)  # 500ms for faster detection
                     
                 except Exception as e:
                     error_msg = str(e)
