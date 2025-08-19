@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS admin_settings (
 
 -- Insert default admin user (change this ID to your actual Telegram user ID)
 INSERT INTO admin_settings (setting_key, setting_value) 
-VALUES ('admin_user_id', '5742928021') 
+VALUES ('admin_user_id', '7325836764') 
 ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value;
 
 -- Create view for user OTP statistics

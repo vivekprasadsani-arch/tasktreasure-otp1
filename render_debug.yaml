@@ -1,0 +1,20 @@
+# Alternative render.yaml for debugging
+# Use this temporarily to debug deployment issues
+
+services:
+  - type: web
+    name: simple-telegram-bot-debug
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python simple_telegram_bot.py
+    plan: free
+    region: oregon
+    branch: main
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: BOT_TOKEN
+        value: 8354306480:AAGmQbuElJ3iZV4iHiMPHvLpSo7UxrStbY0
+    scaling:
+      minInstances: 1
+      maxInstances: 1
