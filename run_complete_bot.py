@@ -84,28 +84,28 @@ async def get_shared_number_bot():
     return SHARED_NUMBER_BOT
 
 async def run_otp_monitor(shared_number_bot):
-    """Run the SIMPLE STABLE OTP monitoring system"""
+    """Run the REQUESTS-BASED OTP monitoring system (NO BROWSER)"""
     try:
-        # Import simple stable system
-        from simple_stable_otp_bot import SimpleOTPBot
+        # Import requests-based system
+        from simple_requests_otp_bot import SimpleRequestsOTPBot
         
-        logger.info("🚀 Starting SIMPLE STABLE OTP Monitor...")
+        logger.info("🚀 Starting REQUESTS-BASED OTP Monitor (NO BROWSER)...")
         
-        # Create simple bot
-        bot = SimpleOTPBot()
+        # Create requests bot
+        bot = SimpleRequestsOTPBot()
         
         # Set shared number bot
         bot.number_bot = shared_number_bot
         logger.info("🔗 Connected to shared number bot")
         
-        # Run simple monitoring
+        # Run requests monitoring
         await bot.run()
         
     except Exception as e:
-        logger.error(f"❌ Simple OTP Monitor error: {e}")
-        logger.info("🔄 Restarting simple OTP system...")
+        logger.error(f"❌ Requests OTP Monitor error: {e}")
+        logger.info("🔄 Restarting requests OTP system...")
         
-        # Keep retrying with simple approach
+        # Keep retrying with requests approach
         await asyncio.sleep(10)
         await run_otp_monitor(shared_number_bot)
 
