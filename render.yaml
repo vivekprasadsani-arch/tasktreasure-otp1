@@ -3,7 +3,7 @@ services:
     name: otp-telegram-bot
     env: python
     buildCommand: pip install -r requirements.txt && playwright install chromium && playwright install-deps chromium
-    startCommand: python run_complete_bot.py
+    startCommand: python hybrid_telegram_bot.py
     plan: free
     region: oregon
     branch: main
