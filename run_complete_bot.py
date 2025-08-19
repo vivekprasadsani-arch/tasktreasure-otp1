@@ -84,40 +84,44 @@ async def get_shared_number_bot():
     return SHARED_NUMBER_BOT
 
 async def run_otp_monitor(shared_number_bot):
-    """Run the OTP monitoring bot with shared number bot"""
+    """Run the ENHANCED OTP monitoring system"""
     try:
-        from otp_telegram_bot import OTPTelegramBot
+        # Import enhanced system
+        from enhanced_otp_system import EnhancedOTPSystem
         
-        logger.info("🔍 Starting OTP Monitor Bot...")
-        bot = OTPTelegramBot()
+        logger.info("🚀 Starting ENHANCED OTP Monitor System...")
         
-        # Use shared number bot instance
-        bot.number_bot = shared_number_bot
-        logger.info("🔗 OTP Monitor connected to shared number bot")
+        # Create enhanced system
+        system = EnhancedOTPSystem()
         
-        # Test connections
-        if not await bot.test_telegram_connection():
-            logger.error("❌ Telegram connection failed")
-            return
+        # Set shared number bot
+        system.number_bot = shared_number_bot
         
-        # Initialize browser and login
-        if not await bot.setup_browser():
-            logger.error("❌ Browser setup failed")
-            return
-        
-        if not await bot.login_to_website():
-            logger.error("❌ Website login failed")
-            return
-        
-        logger.info("✅ OTP Monitor Bot initialized successfully")
-        
-        # Start monitoring loop
-        await bot.run_monitoring_loop()
+        # Run enhanced monitoring
+        await system.run_enhanced_system()
         
     except Exception as e:
-        logger.error(f"❌ OTP Monitor error: {e}")
+        logger.error(f"❌ Enhanced OTP Monitor error: {e}")
+        # Fallback to original system
+        logger.info("🔄 Falling back to original OTP system...")
+        
+        try:
+            from otp_telegram_bot import OTPTelegramBot
+            
+            bot = OTPTelegramBot()
+            bot.number_bot = shared_number_bot
+            
+            if await bot.test_telegram_connection():
+                if await bot.setup_browser():
+                    if await bot.login_to_website():
+                        logger.info("✅ Fallback system ready")
+                        await bot.run_monitoring_loop()
+                        
+        except Exception as fallback_error:
+            logger.error(f"❌ Fallback system error: {fallback_error}")
+            
         # Keep retrying
-        await asyncio.sleep(10)
+        await asyncio.sleep(15)
         await run_otp_monitor(shared_number_bot)
 
 async def run_user_bot(shared_number_bot):

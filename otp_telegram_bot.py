@@ -329,8 +329,8 @@ class OTPTelegramBot:
         try:
             logger.info("Starting login process...")
             
-            # Navigate to login page
-            await self.page.goto(self.login_url, wait_until='load', timeout=30000)
+            # Navigate to login page with optimized timeout
+            await self.page.goto(self.login_url, wait_until='load', timeout=25000)
             
             # Wait for page to load
             await asyncio.sleep(3)
@@ -1070,8 +1070,8 @@ Powered by @tasktreasur\\_support"""
                             await self.restart_browser()
                             browser_restart_count = 0
                     
-                    # Fast monitoring - reduced delay for 10-second response time
-                    await asyncio.sleep(0.5)  # 500ms for faster detection
+                                    # Ultra-fast monitoring for real-time detection
+                await asyncio.sleep(0.3)  # 300ms for instant response
                     
                 except Exception as e:
                     error_msg = str(e)
