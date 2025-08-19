@@ -357,8 +357,9 @@ Powered by TaskTreasure 🚀
         """Run the bot"""
         try:
             logger.info("🚀 Starting Hybrid Telegram Bot...")
+            logger.info(f"🔑 Using token: {self.bot_token[:10]}...")
             
-            # Create application
+            # Create application with timeout settings
             app = Application.builder().token(self.bot_token).build()
             
             # Add handlers
@@ -369,20 +370,38 @@ Powered by TaskTreasure 🚀
             
             logger.info("✅ Handlers added")
             
-            # Start the bot
+            # Test bot connection first
+            try:
+                bot_info = await app.bot.get_me()
+                logger.info(f"✅ Bot connected: @{bot_info.username}")
+            except Exception as conn_error:
+                logger.error(f"❌ Bot connection failed: {conn_error}")
+                raise
+            
+            # Start the bot with polling
+            logger.info("🔄 Starting polling...")
             await app.initialize()
             await app.start()
-            await app.updater.start_polling()
+            await app.updater.start_polling(
+                poll_interval=1.0,
+                timeout=10,
+                read_timeout=6,
+                write_timeout=6,
+                connect_timeout=7,
+                pool_timeout=1
+            )
             
             logger.info("✅ Hybrid Bot is running and polling...")
             
-            # Keep running
+            # Keep running with status updates
             while True:
-                await asyncio.sleep(10)
-                logger.info("🔄 Bot alive - Users: " + str(len(self.user_sessions)))
+                await asyncio.sleep(30)
+                logger.info(f"🔄 Bot alive - Users: {len(self.user_sessions)} - Time: {datetime.now().strftime('%H:%M:%S')}")
                 
         except Exception as e:
             logger.error(f"❌ Bot error: {e}")
+            import traceback
+            logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             raise
 
 def start_health_server():
