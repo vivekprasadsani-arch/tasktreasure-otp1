@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: otp-telegram-bot
+    env: python
+    buildCommand: pip install -r requirements.txt && playwright install chromium && playwright install-deps chromium
+    startCommand: python run_complete_bot.py
+    plan: free
+    region: oregon
+    branch: main
+    envVars:
+      - key: PORT
+        value: 8080
+    scaling:
+      minInstances: 1
+      maxInstances: 1
