@@ -487,9 +487,9 @@ class OTPTelegramBot:
             await submit_button.click()
             logger.info("Clicked submit button")
             
-            # Wait for navigation
-            await self.page.wait_for_load_state('networkidle', timeout=10000)
-            await asyncio.sleep(3)
+            # Wait for navigation with increased timeout
+            await self.page.wait_for_load_state('networkidle', timeout=20000)
+            await asyncio.sleep(5)  # Longer wait after login
             
             # Check if login was successful
             current_url = self.page.url
@@ -881,12 +881,13 @@ Powered by @tasktreasur\\_support"""
                 )
                 self.page.set_default_timeout(15000)
                 
-                # Fast login sequence
-                await self.page.goto(self.login_url, wait_until='load', timeout=15000)
+                # Fast login sequence with better timeouts
+                await self.page.goto(self.login_url, wait_until='load', timeout=20000)
+                await asyncio.sleep(1)
                 await self.page.fill('input[name="username"]', self.username)
                 await self.page.fill('input[name="password"]', self.password)  
                 await self.page.click('input[type="submit"]')
-                await asyncio.sleep(2)
+                await asyncio.sleep(4)  # Wait for login to complete
                 
                 logger.info("✅ Background re-login successful")
                 
