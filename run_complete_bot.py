@@ -71,13 +71,29 @@ def start_health_server():
     except Exception as e:
         logger.error(f"❌ Health server error: {e}")
 
-async def run_otp_monitor():
-    """Run the OTP monitoring bot"""
+# Global shared instance
+SHARED_NUMBER_BOT = None
+
+async def get_shared_number_bot():
+    """Get or create shared number bot instance"""
+    global SHARED_NUMBER_BOT
+    if SHARED_NUMBER_BOT is None:
+        from telegram_number_bot import TelegramNumberBot
+        SHARED_NUMBER_BOT = TelegramNumberBot()
+        logger.info("🔗 Shared number bot instance created")
+    return SHARED_NUMBER_BOT
+
+async def run_otp_monitor(shared_number_bot):
+    """Run the OTP monitoring bot with shared number bot"""
     try:
         from otp_telegram_bot import OTPTelegramBot
         
         logger.info("🔍 Starting OTP Monitor Bot...")
         bot = OTPTelegramBot()
+        
+        # Use shared number bot instance
+        bot.number_bot = shared_number_bot
+        logger.info("🔗 OTP Monitor connected to shared number bot")
         
         # Test connections
         if not await bot.test_telegram_connection():
@@ -102,37 +118,38 @@ async def run_otp_monitor():
         logger.error(f"❌ OTP Monitor error: {e}")
         # Keep retrying
         await asyncio.sleep(10)
-        await run_otp_monitor()
+        await run_otp_monitor(shared_number_bot)
 
-async def run_user_bot():
-    """Run the user interaction bot"""
+async def run_user_bot(shared_number_bot):
+    """Run the user interaction bot using shared instance"""
     try:
-        from telegram_number_bot import TelegramNumberBot
-        
         logger.info("👥 Starting User Interaction Bot...")
-        bot = TelegramNumberBot()
         
-        # Start the bot
-        await bot.run_bot()
+        # Use the shared instance directly
+        await shared_number_bot.run_bot()
         
     except Exception as e:
         logger.error(f"❌ User Bot error: {e}")
         # Keep retrying
         await asyncio.sleep(10)
-        await run_user_bot()
+        await run_user_bot(shared_number_bot)
 
 async def main():
-    """Main async function that runs both bots"""
+    """Main async function that runs both bots with shared state"""
     try:
         logger.info("🚀 Starting Complete OTP Bot System...")
         
         # Give health server a moment to bind
         await asyncio.sleep(1)
         
-        # Run both bots concurrently
+        # Create shared number bot instance
+        shared_number_bot = await get_shared_number_bot()
+        logger.info("✅ Shared bot instance ready")
+        
+        # Run both bots concurrently with shared state
         await asyncio.gather(
-            run_otp_monitor(),
-            run_user_bot(),
+            run_otp_monitor(shared_number_bot),
+            run_user_bot(shared_number_bot),
             return_exceptions=True
         )
         

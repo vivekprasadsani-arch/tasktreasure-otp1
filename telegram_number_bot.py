@@ -9,6 +9,7 @@ import csv
 import json
 import asyncio
 import logging
+import re
 from typing import Dict, List, Optional, Set
 from datetime import datetime
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -113,6 +114,30 @@ class TelegramNumberBot:
                     logger.warning("⚠️ No admin user configured")
         except Exception as e:
             logger.error(f"❌ Error loading admin settings: {e}")
+    
+    def format_phone_number(self, number: str, country: str = "") -> str:
+        """Format phone number for display with proper spacing and country code"""
+        try:
+            # Remove any existing formatting
+            clean_number = re.sub(r'[^\d+]', '', number)
+            
+            # If number doesn't start with +, try to add country code
+            if not clean_number.startswith('+'):
+                # Add + if it's a valid international number
+                if len(clean_number) > 7:
+                    clean_number = '+' + clean_number
+            
+            # Format with spaces for readability
+            if len(clean_number) > 10:
+                # International format: +XX XXX XXX XXXX
+                return f"{clean_number[:3]} {clean_number[3:6]} {clean_number[6:9]} {clean_number[9:]}"
+            else:
+                # Shorter numbers: +XX XXXX XXXX
+                return f"{clean_number[:3]} {clean_number[3:7]} {clean_number[7:]}"
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Number formatting error: {e}")
+            return number  # Return original if formatting fails
     
     def load_user_sessions_from_db(self):
         """Load active user sessions from database on bot restart"""
@@ -382,17 +407,24 @@ Hi {user_name}! 👋
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        message_text = f"""
-📱 **Your Number Assigned!**
+        # Format number properly with country code
+        formatted_number = self.format_phone_number(number, country)
+        
+        message_text = f"""📱 **Your Number Assigned Successfully!**
 
 🌍 **Country:** {country}
-📞 **Number:** `{number}`
-⏰ **Assigned:** {datetime.now().strftime('%H:%M:%S')}
+📞 **Phone Number:** `{formatted_number}`
+⏰ **Assigned Time:** {datetime.now().strftime('%H:%M:%S')}
 
-🎯 **Status:** Waiting for OTP...
-⚡ You will receive OTP codes automatically!
+🎯 **Status:** ✅ Waiting for OTP...
+⚡ **Auto-Notification:** You'll receive OTP codes instantly!
 
-💡 **Note:** Keep this number active. When an OTP arrives, you'll get notified instantly!
+💡 **Instructions:**
+• Keep this number active
+• OTP will arrive within 1-2 minutes
+• Click the number above to copy it
+
+🔔 **Real-time alerts enabled for this number!**
 """
         
         await query.edit_message_text(
@@ -782,17 +814,45 @@ From: TaskTreasure Support Team
     async def notify_user_otp(self, number: str, otp_code: str, service: str, full_message: str):
         """Notify user when OTP arrives for their number"""
         try:
+            logger.info(f"🔍 NOTIFICATION DEBUG: Searching for user with number {number}")
+            logger.info(f"🔍 ACTIVE SESSIONS: {len(self.user_sessions)} total")
+            
+            # Debug: Log all active sessions
+            for user_id, session in self.user_sessions.items():
+                session_number = session.get('number')
+                waiting = session.get('waiting_for_otp')
+                logger.info(f"🔍 USER {user_id}: number={session_number}, waiting={waiting}")
+            
             # Find user with this number
             target_user = None
             target_country = None
+            
+            # Try exact match first
             for user_id, session in self.user_sessions.items():
-                if session.get('number') == number and session.get('waiting_for_otp'):
+                session_number = session.get('number')
+                if session_number == number and session.get('waiting_for_otp'):
                     target_user = user_id
                     target_country = session.get('country', 'Unknown')
+                    logger.info(f"✅ EXACT MATCH: User {user_id} found for number {number}")
                     break
             
+            # Try fuzzy match (remove formatting)
             if not target_user:
-                logger.info(f"📱 No user found waiting for OTP on number {number}")
+                clean_incoming = re.sub(r'[^\d+]', '', number)
+                logger.info(f"🔍 FUZZY SEARCH: Cleaned incoming number: {clean_incoming}")
+                
+                for user_id, session in self.user_sessions.items():
+                    session_number = session.get('number', '')
+                    clean_session = re.sub(r'[^\d+]', '', session_number)
+                    if clean_session == clean_incoming and session.get('waiting_for_otp'):
+                        target_user = user_id
+                        target_country = session.get('country', 'Unknown')
+                        logger.info(f"✅ FUZZY MATCH: User {user_id} found. Session: {session_number} → {clean_session}")
+                        break
+            
+            if not target_user:
+                logger.warning(f"❌ NO USER FOUND: No user waiting for OTP on number {number}")
+                logger.warning(f"❌ Available numbers: {[s.get('number') for s in self.user_sessions.values()]}")
                 return
             
             # Log OTP in history for statistics
@@ -801,27 +861,35 @@ From: TaskTreasure Support Team
             # Send notification to user
             app = Application.builder().token(self.bot_token).build()
             
-            notification_text = f"""
-🔔 **OTP Received!**
+            # Format the number for display
+            formatted_number = self.format_phone_number(number)
+            
+            notification_text = f"""🔔 **OTP CODE RECEIVED!**
 
-📞 **Number:** `{number}`
+📞 **Your Number:** `{formatted_number}`
 🔐 **OTP Code:** `{otp_code}`
 💬 **Service:** {service}
 
-⚡ **Your OTP is ready to use!**
+⚡ **Instructions:**
+• Click the OTP code above to copy it
+• Use it within the next few minutes
+• Keep this number active for more OTPs
 
-**Full Message:**
+📝 **Full Message:**
 ```
 {full_message}
 ```
 
-Powered by @tasktreasur_support
-"""
+🎯 **Status:** OTP delivered successfully!
+Powered by @tasktreasur_support"""
             
             await app.bot.send_message(
                 chat_id=target_user,
-                text=notification_text
+                text=notification_text,
+                parse_mode='Markdown'
             )
+            
+            logger.info(f"✅ USER NOTIFICATION SENT: User {target_user} notified about OTP {otp_code}")
             
             logger.info(f"✅ Notified user {target_user} about OTP {otp_code} for number {number} - Logged to history")
             
