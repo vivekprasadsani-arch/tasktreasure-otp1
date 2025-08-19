@@ -129,9 +129,22 @@ class SimpleRequestsOTPBot:
                 'Origin': 'http://94.23.120.156'
             }
             
+            # Determine correct submit URL
+            if form_action:
+                if form_action.startswith('http'):
+                    submit_url = form_action
+                else:
+                    # Relative URL - construct full URL
+                    base_url = "http://94.23.120.156/ints/"
+                    submit_url = base_url + form_action.lstrip('/')
+            else:
+                submit_url = self.login_url
+            
+            logger.info(f"Submitting to: {submit_url}")
+            
             # Submit login
             login_response = self.session.post(
-                self.login_url, 
+                submit_url, 
                 data=login_data,
                 headers=headers,
                 timeout=30,
