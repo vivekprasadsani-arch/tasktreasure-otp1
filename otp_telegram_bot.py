@@ -23,15 +23,7 @@ import telegram
 from telegram.constants import ParseMode
 from supabase import create_client, Client
 
-# Import our number bot for user notifications
-try:
-    from telegram_number_bot import TelegramNumberBot
-    NUMBER_BOT_AVAILABLE = True
-except ImportError:
-    NUMBER_BOT_AVAILABLE = False
-    logger.warning("⚠️ telegram_number_bot not available - user notifications disabled")
-
-# Configure logging
+# Configure logging first
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -43,6 +35,14 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+# Import our number bot for user notifications
+try:
+    from telegram_number_bot import TelegramNumberBot
+    NUMBER_BOT_AVAILABLE = True
+except ImportError:
+    NUMBER_BOT_AVAILABLE = False
+    logger.warning("⚠️ telegram_number_bot not available - user notifications disabled")
+
 class OTPTelegramBot:
     def __init__(self):
         # Website credentials and URLs
@@ -51,8 +51,11 @@ class OTPTelegramBot:
         self.login_url = "http://94.23.120.156/ints/login"
         self.sms_url = "http://94.23.120.156/ints/client/SMSCDRStats"
         
-        # Telegram Bot credentials
-        self.bot_token = "8354306480:AAGmQbuElJ3iZV4iHiMPHvLpSo7UxrStbY0"
+        # Telegram Bot credentials from environment
+        self.bot_token = os.getenv('BOT_TOKEN')
+        if not self.bot_token:
+            logger.error("❌ BOT_TOKEN environment variable not set!")
+            raise ValueError("BOT_TOKEN environment variable is required")
         self.channel_id = "-1002724043027"
         
         # Initialize Telegram bot
@@ -1070,8 +1073,8 @@ Powered by @tasktreasur\\_support"""
                             await self.restart_browser()
                             browser_restart_count = 0
                     
-                                    # Ultra-fast monitoring for real-time detection
-                await asyncio.sleep(0.3)  # 300ms for instant response
+                    # Ultra-fast monitoring for real-time detection
+                    await asyncio.sleep(0.3)  # 300ms for instant response
                     
                 except Exception as e:
                     error_msg = str(e)

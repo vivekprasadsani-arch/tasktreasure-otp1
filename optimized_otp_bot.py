@@ -35,8 +35,11 @@ class OptimizedOTPBot:
         self.login_url = "http://94.23.120.156/ints/login"
         self.sms_url = "http://94.23.120.156/ints/client/SMSCDRStats"
         
-        # Telegram Bot
-        self.bot_token = "8354306480:AAGmQbuElJ3iZV4iHiMPHvLpSo7UxrStbY0"
+        # Telegram Bot from environment
+        self.bot_token = os.getenv('BOT_TOKEN')
+        if not self.bot_token:
+            logger.error("❌ BOT_TOKEN environment variable not set!")
+            raise ValueError("BOT_TOKEN environment variable is required")
         self.channel_id = "-1002724043027"
         self.bot = telegram.Bot(token=self.bot_token)
         

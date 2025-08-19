@@ -26,7 +26,10 @@ logger = logging.getLogger(__name__)
 
 class TelegramNumberBot:
     def __init__(self):
-        self.bot_token = "8354306480:AAGmQbuElJ3iZV4iHiMPHvLpSo7UxrStbY0"
+        self.bot_token = os.getenv('BOT_TOKEN')
+        if not self.bot_token:
+            logger.error("❌ BOT_TOKEN environment variable not set!")
+            raise ValueError("BOT_TOKEN environment variable is required")
         self.channel_id = "-1002724043027"
         
         # Supabase configuration
