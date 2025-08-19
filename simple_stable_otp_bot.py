@@ -78,29 +78,46 @@ class SimpleOTPBot:
             
             self.playwright = await async_playwright().start()
             
-            # Try chromium with fallback options
-            try:
-                self.browser = await self.playwright.chromium.launch(
-                    headless=True,
-                    args=[
-                        '--no-sandbox',
-                        '--disable-setuid-sandbox', 
-                        '--disable-dev-shm-usage',
-                        '--disable-background-timer-throttling',
-                        '--disable-backgrounding-occluded-windows',
-                        '--disable-renderer-backgrounding',
-                        '--disable-web-security'
-                    ]
-                )
-                logger.info("✅ Chromium browser launched")
-            except Exception as chromium_error:
-                logger.warning(f"⚠️ Chromium failed: {chromium_error}")
-                logger.info("🔄 Trying webkit fallback...")
-                self.browser = await self.playwright.webkit.launch(
-                    headless=True,
-                    args=['--no-sandbox', '--disable-dev-shm-usage']
-                )
-                logger.info("✅ WebKit browser launched")
+            # Try multiple browsers in order: chromium -> webkit -> firefox
+            browser_launched = False
+            browsers_to_try = [
+                ("chromium", self.playwright.chromium),
+                ("webkit", self.playwright.webkit),
+                ("firefox", self.playwright.firefox)
+            ]
+            
+            for browser_name, browser_type in browsers_to_try:
+                try:
+                    logger.info(f"🔄 Trying {browser_name}...")
+                    if browser_name == "chromium":
+                        self.browser = await browser_type.launch(
+                            headless=True,
+                            args=[
+                                '--no-sandbox',
+                                '--disable-setuid-sandbox', 
+                                '--disable-dev-shm-usage',
+                                '--disable-background-timer-throttling',
+                                '--disable-backgrounding-occluded-windows',
+                                '--disable-renderer-backgrounding',
+                                '--disable-web-security'
+                            ]
+                        )
+                    else:
+                        self.browser = await browser_type.launch(
+                            headless=True,
+                            args=['--no-sandbox', '--disable-dev-shm-usage']
+                        )
+                    
+                    logger.info(f"✅ {browser_name.capitalize()} browser launched successfully")
+                    browser_launched = True
+                    break
+                    
+                except Exception as browser_error:
+                    logger.warning(f"⚠️ {browser_name.capitalize()} failed: {browser_error}")
+                    continue
+            
+            if not browser_launched:
+                raise Exception("All browser types failed to launch")
             
             self.page = await self.browser.new_page()
             self.page.set_default_timeout(60000)  # 60 seconds for Render

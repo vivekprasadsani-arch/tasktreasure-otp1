@@ -2,7 +2,7 @@ services:
   - type: web
     name: otp-telegram-bot
     env: python
-    buildCommand: pip install -r requirements.txt && playwright install chromium-headless-shell && playwright install-deps chromium
+    buildCommand: pip install -r requirements.txt && playwright install && playwright install-deps
     startCommand: python run_bot.py
     plan: free
     region: oregon
