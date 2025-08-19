@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-IMMEDIATE FIX: Run the telegram test bot
-This file exists to satisfy Render's cached startCommand
+TaskTreasure OTP Bot - Complete System
+Runs both OTP monitoring and user interaction bots
 """
 
 import subprocess
 import sys
 
 if __name__ == "__main__":
-    print("🔄 REDIRECT: Running telegram test bot instead...")
+    print("🚀 STARTING COMPLETE OTP BOT SYSTEM...")
     try:
-        subprocess.run([sys.executable, "telegram_test_bot.py"])
+        subprocess.run([sys.executable, "run_complete_bot.py"])
     except Exception as e:
-        print(f"❌ Error: {e}")
-        # Fallback to simple bot
+        print(f"❌ Complete system error: {e}")
+        print("🔄 Fallback: Starting number bot only...")
         try:
-            subprocess.run([sys.executable, "simple_telegram_bot.py"])
-        except:
-            print("❌ All bots failed")
+            subprocess.run([sys.executable, "telegram_number_bot.py"])
+        except Exception as fallback_error:
+            print(f"❌ Fallback failed: {fallback_error}")
