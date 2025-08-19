@@ -72,18 +72,38 @@ class SimpleOTPBot:
             logger.warning(f"⚠️ Number bot not available: {e}")
     
     async def setup_browser(self):
-        """Simple browser setup"""
+        """Render-compatible browser setup"""
         try:
             logger.info("🌐 Setting up browser...")
             
             self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(
-                headless=True,
-                args=['--no-sandbox', '--disable-dev-shm-usage']
-            )
+            
+            # Try chromium with fallback options
+            try:
+                self.browser = await self.playwright.chromium.launch(
+                    headless=True,
+                    args=[
+                        '--no-sandbox',
+                        '--disable-setuid-sandbox', 
+                        '--disable-dev-shm-usage',
+                        '--disable-background-timer-throttling',
+                        '--disable-backgrounding-occluded-windows',
+                        '--disable-renderer-backgrounding',
+                        '--disable-web-security'
+                    ]
+                )
+                logger.info("✅ Chromium browser launched")
+            except Exception as chromium_error:
+                logger.warning(f"⚠️ Chromium failed: {chromium_error}")
+                logger.info("🔄 Trying webkit fallback...")
+                self.browser = await self.playwright.webkit.launch(
+                    headless=True,
+                    args=['--no-sandbox', '--disable-dev-shm-usage']
+                )
+                logger.info("✅ WebKit browser launched")
             
             self.page = await self.browser.new_page()
-            self.page.set_default_timeout(30000)
+            self.page.set_default_timeout(60000)  # 60 seconds for Render
             
             logger.info("✅ Browser ready")
             return True
