@@ -84,44 +84,29 @@ async def get_shared_number_bot():
     return SHARED_NUMBER_BOT
 
 async def run_otp_monitor(shared_number_bot):
-    """Run the ENHANCED OTP monitoring system"""
+    """Run the SIMPLE STABLE OTP monitoring system"""
     try:
-        # Import enhanced system
-        from enhanced_otp_system import EnhancedOTPSystem
+        # Import simple stable system
+        from simple_stable_otp_bot import SimpleOTPBot
         
-        logger.info("🚀 Starting ENHANCED OTP Monitor System...")
+        logger.info("🚀 Starting SIMPLE STABLE OTP Monitor...")
         
-        # Create enhanced system
-        system = EnhancedOTPSystem()
+        # Create simple bot
+        bot = SimpleOTPBot()
         
         # Set shared number bot
-        system.number_bot = shared_number_bot
+        bot.number_bot = shared_number_bot
+        logger.info("🔗 Connected to shared number bot")
         
-        # Run enhanced monitoring
-        await system.run_enhanced_system()
+        # Run simple monitoring
+        await bot.run()
         
     except Exception as e:
-        logger.error(f"❌ Enhanced OTP Monitor error: {e}")
-        # Fallback to original system
-        logger.info("🔄 Falling back to original OTP system...")
+        logger.error(f"❌ Simple OTP Monitor error: {e}")
+        logger.info("🔄 Restarting simple OTP system...")
         
-        try:
-            from otp_telegram_bot import OTPTelegramBot
-            
-            bot = OTPTelegramBot()
-            bot.number_bot = shared_number_bot
-            
-            if await bot.test_telegram_connection():
-                if await bot.setup_browser():
-                    if await bot.login_to_website():
-                        logger.info("✅ Fallback system ready")
-                        await bot.run_monitoring_loop()
-                        
-        except Exception as fallback_error:
-            logger.error(f"❌ Fallback system error: {fallback_error}")
-            
-        # Keep retrying
-        await asyncio.sleep(15)
+        # Keep retrying with simple approach
+        await asyncio.sleep(10)
         await run_otp_monitor(shared_number_bot)
 
 async def run_user_bot(shared_number_bot):
