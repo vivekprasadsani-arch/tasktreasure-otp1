@@ -29,7 +29,7 @@ class SimpleRequestsOTPBot:
         # Website credentials
         self.login_url = "http://94.23.120.156/ints/login"
         self.sms_url = "http://94.23.120.156/ints/client/SMSCDRStats"
-        self.username = "ronirunsms"
+        self.username = "Roni_dada"
         self.password = "Roni_dada"
         
         # Session for persistent cookies
@@ -169,8 +169,15 @@ class SimpleRequestsOTPBot:
                 self.logged_in = True
                 return True
             else:
-                # Check for error messages
-                if "error" in login_response.text.lower() or "invalid" in login_response.text.lower():
+                # Check for specific error messages
+                response_text = login_response.text.lower()
+                if "captcha verification failed" in response_text:
+                    logger.error("❌ Login failed - CAPTCHA verification failed")
+                    logger.info("🔧 SOLUTION NEEDED: Website may have changed captcha system")
+                elif "username/password invalid" in response_text:
+                    logger.error("❌ Login failed - Invalid credentials")
+                    logger.info("🔧 SOLUTION NEEDED: Please check username/password")
+                elif "error" in response_text or "invalid" in response_text:
                     logger.error("❌ Login failed - error message detected")
                 else:
                     logger.error(f"❌ Login failed - no success indicators found")
