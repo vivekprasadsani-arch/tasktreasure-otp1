@@ -208,8 +208,7 @@ Hi {user_name}! 👋
         
         await update.message.reply_text(
             welcome_message,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            reply_markup=reply_markup
         )
     
     async def show_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -239,9 +238,8 @@ Hi {user_name}! 👋
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            "🌍 **Choose a Country:**\n\nSelect a country to get a phone number:",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            "🌍 Choose a Country:\n\nSelect a country to get a phone number:",
+            reply_markup=reply_markup
         )
     
     async def handle_country_selection(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -257,8 +255,7 @@ Hi {user_name}! 👋
         
         if not number:
             await query.edit_message_text(
-                f"❌ Sorry, no numbers available for {country} right now.\n\nTry another country or contact support.",
-                parse_mode='Markdown'
+                f"❌ Sorry, no numbers available for {country} right now.\n\nTry another country or contact support."
             )
             return
         
@@ -292,8 +289,7 @@ Hi {user_name}! 👋
         
         await query.edit_message_text(
             message_text,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            reply_markup=reply_markup
         )
         
         # Save session to database
@@ -351,8 +347,7 @@ Hi {user_name}! 👋
         
         await query.edit_message_text(
             message_text,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
+            reply_markup=reply_markup
         )
         
         # Save updated session
@@ -385,7 +380,7 @@ Hi {user_name}! 👋
 💡 **Tip:** OTP codes will be delivered instantly when they arrive!
 """
         
-        await update.message.reply_text(status_message, parse_mode='Markdown')
+        await update.message.reply_text(status_message)
     
     async def show_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help information"""
@@ -427,7 +422,7 @@ Contact: @tasktreasur_support
 Powered by TaskTreasure 🚀
 """
         
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        await update.message.reply_text(help_text)
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages"""
@@ -454,8 +449,7 @@ Powered by TaskTreasure 🚀
             await self.show_help(update, context)
         else:
             await update.message.reply_text(
-                "🤖 Please use the menu buttons below or type /start to begin.",
-                parse_mode='Markdown'
+                "🤖 Please use the menu buttons below or type /start to begin."
             )
     
     async def handle_callback_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -468,7 +462,31 @@ Powered by TaskTreasure 🚀
         elif query.data.startswith("change_"):
             await self.handle_change_number(update, context)
         elif query.data == "back_to_menu":
-            await self.start_command(update, context)
+            # For callback queries, we need to edit the message instead
+            keyboard = [
+                [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
+                [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
+            ]
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            
+            welcome_message = f"""
+🤖 **Welcome to TaskTreasure OTP Bot** 🤖
+
+🎯 **What I can do:**
+📱 **Get Number** - Choose country and get a phone number
+🔄 **Change Number** - Get a different number  
+📊 **My Status** - Check your current number status
+⚡ **Auto OTP** - Receive OTP codes instantly
+
+🌍 **Available Countries:** {len(self.available_countries)}
+🔢 **Total Numbers:** 1000+
+
+**Choose an option from the menu below:**
+"""
+            
+            await query.edit_message_text(
+                welcome_message
+            )
     
     async def save_user_session(self, user_id: int, session_data: dict):
         """Save user session to database"""
@@ -526,8 +544,7 @@ Powered by @tasktreasur_support
             
             await app.bot.send_message(
                 chat_id=target_user,
-                text=notification_text,
-                parse_mode='Markdown'
+                text=notification_text
             )
             
             logger.info(f"✅ Notified user {target_user} about OTP {otp_code} for number {number}")
