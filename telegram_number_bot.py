@@ -139,6 +139,23 @@ class TelegramNumberBot:
             logger.warning(f"⚠️ Number formatting error: {e}")
             return number  # Return original if formatting fails
     
+    def get_copy_friendly_number(self, number: str) -> str:
+        """Get clean number for copy-paste without spaces"""
+        try:
+            # Remove any existing formatting and ensure clean format
+            clean_number = re.sub(r'[^\d+]', '', number)
+            
+            # If number doesn't start with +, add it
+            if not clean_number.startswith('+'):
+                if len(clean_number) > 7:
+                    clean_number = '+' + clean_number
+            
+            return clean_number
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Copy-friendly format error: {e}")
+            return number
+    
     def load_user_sessions_from_db(self):
         """Load active user sessions from database on bot restart"""
         try:
@@ -407,24 +424,26 @@ Hi {user_name}! 👋
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        # Format number properly with country code
-        formatted_number = self.format_phone_number(number, country)
+        # Get both formatted and copy-friendly versions
+        formatted_display = self.format_phone_number(number, country)
+        copy_friendly = self.get_copy_friendly_number(number)
         
         message_text = f"""📱 **Your Number Assigned Successfully!**
 
 🌍 **Country:** {country}
-📞 **Phone Number:** `{formatted_number}`
-⏰ **Assigned Time:** {datetime.now().strftime('%H:%M:%S')}
+📞 **Display:** {formatted_display}
+📋 **Copy Number:** `{copy_friendly}`
+⏰ **Assigned:** {datetime.now().strftime('%H:%M:%S')}
 
 🎯 **Status:** ✅ Waiting for OTP...
 ⚡ **Auto-Notification:** You'll receive OTP codes instantly!
 
 💡 **Instructions:**
-• Keep this number active
-• OTP will arrive within 1-2 minutes
 • Click the number above to copy it
+• OTP will arrive within 1-2 minutes
+• Keep this number active for more OTPs
 
-🔔 **Real-time alerts enabled for this number!**
+🔔 **Real-time alerts enabled!**
 """
         
         await query.edit_message_text(
@@ -507,9 +526,14 @@ Hi {user_name}! 👋
             assigned_time = datetime.fromisoformat(session['assigned_at'])
             duration = datetime.now() - assigned_time
             
+            # Get copy-friendly version of the current number
+            copy_friendly = self.get_copy_friendly_number(session['number'])
+            formatted_display = self.format_phone_number(session['number'])
+            
             session_info = f"""
 🌍 **Current Country:** {session['country']}
-📞 **Current Number:** `{session['number']}`
+📞 **Display:** {formatted_display}
+📋 **Copy Number:** `{copy_friendly}`
 ⏰ **Assigned:** {assigned_time.strftime('%Y-%m-%d %H:%M:%S')}
 ⌛ **Duration:** {str(duration).split('.')[0]}
 🎯 **Status:** {'🟢 Waiting for OTP' if session['waiting_for_otp'] else '🔴 Inactive'}
@@ -861,27 +885,14 @@ From: TaskTreasure Support Team
             # Send notification to user
             app = Application.builder().token(self.bot_token).build()
             
-            # Format the number for display
-            formatted_number = self.format_phone_number(number)
+            # Get copy-friendly number for notifications  
+            copy_friendly = self.get_copy_friendly_number(number)
             
-            notification_text = f"""🔔 **OTP CODE RECEIVED!**
+            notification_text = f"""🔔 **OTP Received**
 
-📞 **Your Number:** `{formatted_number}`
-🔐 **OTP Code:** `{otp_code}`
-💬 **Service:** {service}
-
-⚡ **Instructions:**
-• Click the OTP code above to copy it
-• Use it within the next few minutes
-• Keep this number active for more OTPs
-
-📝 **Full Message:**
-```
-{full_message}
-```
-
-🎯 **Status:** OTP delivered successfully!
-Powered by @tasktreasur_support"""
+📞 Number: `{copy_friendly}`
+🔐 OTP: `{otp_code}`
+💬 Service: {service}"""
             
             await app.bot.send_message(
                 chat_id=target_user,

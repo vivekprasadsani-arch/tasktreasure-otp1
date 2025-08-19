@@ -301,7 +301,7 @@ class OTPTelegramBot:
         )
         
         # Set page timeout to prevent hanging
-        self.page.set_default_timeout(15000)  # 15 seconds
+        self.page.set_default_timeout(30000)  # 30 seconds - increased for stability
         
         # Disable images and CSS to save memory (we only need table data)
         await self.page.route("**/*.{png,jpg,jpeg,gif,css,woff,woff2}", lambda route: route.abort())
@@ -851,10 +851,17 @@ Powered by @tasktreasur\\_support"""
                     full_message = sms_data.get('message', '')
                     
                     if number and otp_code:
+                        logger.info(f"🔔 ATTEMPTING USER NOTIFICATION: Number={number}, OTP={otp_code}, Service={service}")
+                        logger.info(f"🔔 NUMBER BOT SESSIONS: {len(self.number_bot.user_sessions)} active users")
+                        
                         await self.number_bot.notify_user_otp(number, otp_code, service, full_message)
-                        logger.info(f"📱 User notification attempted for number {number}")
+                        logger.info(f"📱 User notification process completed for number {number}")
+                    else:
+                        logger.warning(f"⚠️ Invalid data for notification: number={number}, otp={otp_code}")
                 except Exception as notify_error:
-                    logger.warning(f"⚠️ User notification failed: {notify_error}")
+                    logger.error(f"❌ User notification failed: {notify_error}")
+                    import traceback
+                    logger.error(f"❌ Full traceback: {traceback.format_exc()}")
             
             return True
             
@@ -870,7 +877,7 @@ Powered by @tasktreasur\\_support"""
                 for attempt in range(3):
                     try:
                         logger.info(f"Navigation attempt {attempt + 1}/3")
-                        await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=20000)
+                        await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=40000)
                         break
                     except Exception as nav_error:
                         logger.warning(f"Navigation attempt {attempt + 1} failed: {nav_error}")
@@ -881,7 +888,7 @@ Powered by @tasktreasur\\_support"""
                                 logger.info("Restarting browser and re-logging in...")
                                 if await self.restart_browser():
                                     logger.info("Browser restarted successfully, attempting final navigation...")
-                                    await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=25000)
+                                    await self.page.goto(self.sms_url, wait_until='domcontentloaded', timeout=45000)
                                     break
                                 else:
                                     logger.error("Browser restart failed")
@@ -997,7 +1004,7 @@ Powered by @tasktreasur\\_support"""
                             logger.info("Performing strategic page refresh...")
                             try:
                                 async with self.navigation_lock:
-                                    await self.page.reload(wait_until="domcontentloaded", timeout=20000)
+                                    await self.page.reload(wait_until="domcontentloaded", timeout=35000)
                                     await asyncio.sleep(1)
                             except Exception as refresh_error:
                                 logger.warning(f"Page refresh failed: {refresh_error}")
