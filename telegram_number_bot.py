@@ -41,10 +41,15 @@ class TelegramNumberBot:
         self.country_number_indices: Dict[str, int] = {}  # country -> current_index
         self.assigned_numbers: Dict[str, Set[str]] = {}  # country -> set_of_assigned_numbers
         
+        # Admin settings
+        self.admin_user_id = None
+        
         # Initialize
         self.init_supabase()
         self.load_countries()
         self.load_number_states()
+        self.load_admin_settings()
+        self.load_user_sessions_from_db()
     
     def init_supabase(self):
         """Initialize Supabase connection"""
@@ -95,6 +100,109 @@ class TelegramNumberBot:
             logger.info("✅ Number states initialized")
         except Exception as e:
             logger.error(f"❌ Error initializing number states: {e}")
+    
+    def load_admin_settings(self):
+        """Load admin settings from database"""
+        try:
+            if self.supabase:
+                result = self.supabase.table('admin_settings').select('setting_value').eq('setting_key', 'admin_user_id').execute()
+                if result.data:
+                    self.admin_user_id = int(result.data[0]['setting_value'])
+                    logger.info(f"✅ Admin user loaded: {self.admin_user_id}")
+                else:
+                    logger.warning("⚠️ No admin user configured")
+        except Exception as e:
+            logger.error(f"❌ Error loading admin settings: {e}")
+    
+    def load_user_sessions_from_db(self):
+        """Load active user sessions from database on bot restart"""
+        try:
+            if self.supabase:
+                result = self.supabase.table('user_sessions').select('*').eq('waiting_for_otp', True).execute()
+                for session in result.data:
+                    user_id = session['user_id']
+                    self.user_sessions[user_id] = {
+                        'country': session['country'],
+                        'number': session['number'],
+                        'assigned_at': session['assigned_at'],
+                        'waiting_for_otp': session['waiting_for_otp']
+                    }
+                    
+                    # Mark number as assigned
+                    country = session['country']
+                    number = session['number']
+                    if country in self.assigned_numbers:
+                        self.assigned_numbers[country].add(number)
+                
+                logger.info(f"✅ Restored {len(result.data)} user sessions from database")
+        except Exception as e:
+            logger.error(f"❌ Error loading user sessions: {e}")
+    
+    def is_admin(self, user_id: int) -> bool:
+        """Check if user is admin"""
+        return self.admin_user_id and user_id == self.admin_user_id
+    
+    async def log_otp_received(self, user_id: int, number: str, country: str, service: str, otp_code: str, message: str):
+        """Log OTP received for user statistics"""
+        try:
+            if self.supabase:
+                data = {
+                    'user_id': user_id,
+                    'number': number,
+                    'country': country,
+                    'service': service,
+                    'otp_code': otp_code,
+                    'message': message,
+                    'received_at': datetime.now().isoformat()
+                }
+                self.supabase.table('otp_history').insert(data).execute()
+                logger.info(f"📊 OTP logged for user {user_id}: {service} - {otp_code}")
+        except Exception as e:
+            logger.error(f"❌ Error logging OTP: {e}")
+    
+    async def get_user_otp_stats(self, user_id: int) -> dict:
+        """Get user OTP statistics"""
+        try:
+            if self.supabase:
+                # Get overall stats
+                stats_result = self.supabase.table('user_otp_stats').select('*').eq('user_id', user_id).execute()
+                
+                # Get recent OTPs
+                recent_result = self.supabase.table('otp_history').select('*').eq('user_id', user_id).order('received_at', desc=True).limit(5).execute()
+                
+                if stats_result.data:
+                    stats = stats_result.data[0]
+                    return {
+                        'total_otps': stats.get('total_otps', 0),
+                        'unique_services': stats.get('unique_services', 0),
+                        'unique_countries': stats.get('unique_countries', 0),
+                        'last_otp_at': stats.get('last_otp_at'),
+                        'first_otp_at': stats.get('first_otp_at'),
+                        'recent_otps': recent_result.data
+                    }
+                else:
+                    return {
+                        'total_otps': 0,
+                        'unique_services': 0,
+                        'unique_countries': 0,
+                        'last_otp_at': None,
+                        'first_otp_at': None,
+                        'recent_otps': []
+                    }
+        except Exception as e:
+            logger.error(f"❌ Error getting OTP stats: {e}")
+            return {'total_otps': 0, 'unique_services': 0, 'unique_countries': 0, 'recent_otps': []}
+    
+    async def get_all_users(self) -> list:
+        """Get all users who have used the bot"""
+        try:
+            if self.supabase:
+                result = self.supabase.table('user_sessions').select('user_id').execute()
+                return list(set([session['user_id'] for session in result.data]))
+            return []
+        except Exception as e:
+            logger.error(f"❌ Error getting all users: {e}")
+            return []
     
     def get_country_numbers(self, country: str) -> List[str]:
         """Get all numbers from a country CSV file"""
@@ -354,30 +462,65 @@ Hi {user_name}! 👋
         await self.save_user_session(user_id, self.user_sessions[user_id])
     
     async def show_user_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Show user current status"""
+        """Show user current status with OTP statistics"""
         user_id = update.effective_user.id
         
-        if user_id not in self.user_sessions:
-            await update.message.reply_text(
-                "📊 **Your Status:**\n\n❌ No active number assigned.\n\n📱 Click 'Get Number' to start!",
-                parse_mode='Markdown'
-            )
-            return
+        # Get OTP statistics
+        otp_stats = await self.get_user_otp_stats(user_id)
         
-        session = self.user_sessions[user_id]
-        assigned_time = datetime.fromisoformat(session['assigned_at'])
-        duration = datetime.now() - assigned_time
-        
-        status_message = f"""
-📊 **Your Current Status:**
-
-🌍 **Country:** {session['country']}
-📞 **Number:** `{session['number']}`
+        # Current session info
+        session_info = ""
+        if user_id in self.user_sessions:
+            session = self.user_sessions[user_id]
+            assigned_time = datetime.fromisoformat(session['assigned_at'])
+            duration = datetime.now() - assigned_time
+            
+            session_info = f"""
+🌍 **Current Country:** {session['country']}
+📞 **Current Number:** `{session['number']}`
 ⏰ **Assigned:** {assigned_time.strftime('%Y-%m-%d %H:%M:%S')}
 ⌛ **Duration:** {str(duration).split('.')[0]}
 🎯 **Status:** {'🟢 Waiting for OTP' if session['waiting_for_otp'] else '🔴 Inactive'}
-
-💡 **Tip:** OTP codes will be delivered instantly when they arrive!
+"""
+        else:
+            session_info = "\n❌ **No active number assigned.**\n📱 Click 'Get Number' to start!"
+        
+        # OTP Statistics
+        stats_info = f"""
+📊 **OTP Statistics:**
+🔢 **Total OTPs Received:** {otp_stats['total_otps']}
+🌍 **Countries Used:** {otp_stats['unique_countries']}
+💬 **Services Used:** {otp_stats['unique_services']}
+"""
+        
+        # Recent OTPs
+        recent_info = ""
+        if otp_stats['recent_otps']:
+            recent_info = "\n🕒 **Recent OTPs:**\n"
+            for i, otp in enumerate(otp_stats['recent_otps'][:3], 1):
+                received_time = datetime.fromisoformat(otp['received_at'].replace('Z', '+00:00')).strftime('%m-%d %H:%M')
+                recent_info += f"{i}. {otp['service']} - `{otp['otp_code']}` ({received_time})\n"
+        
+        # Last activity
+        last_activity = ""
+        if otp_stats['last_otp_at']:
+            last_time = datetime.fromisoformat(otp_stats['last_otp_at'].replace('Z', '+00:00'))
+            time_diff = datetime.now().replace(tzinfo=last_time.tzinfo) - last_time
+            if time_diff.days > 0:
+                last_activity = f"\n⏰ **Last OTP:** {time_diff.days} days ago"
+            else:
+                hours = time_diff.seconds // 3600
+                minutes = (time_diff.seconds % 3600) // 60
+                if hours > 0:
+                    last_activity = f"\n⏰ **Last OTP:** {hours}h {minutes}m ago"
+                else:
+                    last_activity = f"\n⏰ **Last OTP:** {minutes}m ago"
+        
+        status_message = f"""
+📊 **Your Status & Statistics:**
+{session_info}
+{stats_info}{last_activity}{recent_info}
+💡 **Tip:** OTP codes are delivered instantly and tracked automatically!
 """
         
         await update.message.reply_text(status_message)
@@ -423,6 +566,134 @@ Powered by TaskTreasure 🚀
 """
         
         await update.message.reply_text(help_text)
+    
+    async def admin_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to broadcast message to all users"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ You don't have permission to use this command.")
+            return
+        
+        # Check if message provided
+        if not context.args:
+            await update.message.reply_text(
+                "📢 **Admin Broadcast Usage:**\n\n"
+                "`/broadcast Your message here`\n\n"
+                "This will send your message to all bot users."
+            )
+            return
+        
+        # Get message
+        broadcast_message = " ".join(context.args)
+        
+        # Get all users
+        all_users = await self.get_all_users()
+        
+        if not all_users:
+            await update.message.reply_text("❌ No users found to broadcast to.")
+            return
+        
+        # Confirm broadcast
+        await update.message.reply_text(
+            f"📢 **Broadcasting to {len(all_users)} users...**\n\n"
+            f"**Message:**\n{broadcast_message}"
+        )
+        
+        # Send to all users
+        success_count = 0
+        failed_count = 0
+        
+        app = Application.builder().token(self.bot_token).build()
+        
+        for target_user in all_users:
+            try:
+                admin_message = f"""
+📢 **Admin Message**
+
+{broadcast_message}
+
+---
+From: TaskTreasure Support Team
+"""
+                await app.bot.send_message(
+                    chat_id=target_user,
+                    text=admin_message
+                )
+                success_count += 1
+                await asyncio.sleep(0.1)  # Rate limiting
+                
+            except Exception as e:
+                failed_count += 1
+                logger.warning(f"Failed to send to user {target_user}: {e}")
+        
+        # Report results
+        await update.message.reply_text(
+            f"✅ **Broadcast Complete!**\n\n"
+            f"📤 **Sent:** {success_count} users\n"
+            f"❌ **Failed:** {failed_count} users\n"
+            f"👥 **Total:** {len(all_users)} users"
+        )
+    
+    async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to show bot statistics"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ You don't have permission to use this command.")
+            return
+        
+        try:
+            # Get overall stats
+            if self.supabase:
+                total_users_result = self.supabase.table('user_sessions').select('user_id', count='exact').execute()
+                total_otps_result = self.supabase.table('otp_history').select('id', count='exact').execute()
+                active_sessions_result = self.supabase.table('user_sessions').select('id', count='exact').eq('waiting_for_otp', True).execute()
+                
+                total_users = total_users_result.count
+                total_otps = total_otps_result.count
+                active_sessions = active_sessions_result.count
+                
+                # Get country distribution
+                country_stats = {}
+                for country in self.available_countries:
+                    assigned_count = len(self.assigned_numbers.get(country, set()))
+                    total_numbers = len(self.get_country_numbers(country))
+                    country_stats[country] = f"{assigned_count}/{total_numbers}"
+                
+                stats_message = f"""
+🔧 **Admin Dashboard - Bot Statistics**
+
+👥 **Users:**
+📊 Total Users: {total_users}
+🟢 Active Sessions: {active_sessions}
+📱 Numbers Assigned: {sum(len(nums) for nums in self.assigned_numbers.values())}
+
+📊 **OTP Statistics:**
+🔢 Total OTPs Processed: {total_otps}
+⚡ Average per User: {total_otps / max(total_users, 1):.1f}
+
+🌍 **Country Usage:**
+"""
+                
+                for country, usage in country_stats.items():
+                    stats_message += f"📂 {country}: {usage}\n"
+                
+                stats_message += f"""
+💾 **System Status:**
+✅ Supabase: Connected
+✅ Countries: {len(self.available_countries)} loaded
+✅ Number Management: Active
+✅ OTP Tracking: Enabled
+
+🔧 **Admin ID:** {self.admin_user_id}
+"""
+                
+                await update.message.reply_text(stats_message)
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error getting stats: {e}")
+            logger.error(f"Admin stats error: {e}")
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle text messages"""
@@ -513,14 +784,19 @@ Powered by TaskTreasure 🚀
         try:
             # Find user with this number
             target_user = None
+            target_country = None
             for user_id, session in self.user_sessions.items():
                 if session.get('number') == number and session.get('waiting_for_otp'):
                     target_user = user_id
+                    target_country = session.get('country', 'Unknown')
                     break
             
             if not target_user:
                 logger.info(f"📱 No user found waiting for OTP on number {number}")
                 return
+            
+            # Log OTP in history for statistics
+            await self.log_otp_received(target_user, number, target_country, service, otp_code, full_message)
             
             # Send notification to user
             app = Application.builder().token(self.bot_token).build()
@@ -547,7 +823,7 @@ Powered by @tasktreasur_support
                 text=notification_text
             )
             
-            logger.info(f"✅ Notified user {target_user} about OTP {otp_code} for number {number}")
+            logger.info(f"✅ Notified user {target_user} about OTP {otp_code} for number {number} - Logged to history")
             
         except Exception as e:
             logger.error(f"❌ Error notifying user: {e}")
@@ -560,6 +836,8 @@ Powered by @tasktreasur_support
             
             # Add handlers
             app.add_handler(CommandHandler("start", self.start_command))
+            app.add_handler(CommandHandler("broadcast", self.admin_broadcast))
+            app.add_handler(CommandHandler("stats", self.admin_stats))
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
             app.add_handler(CallbackQueryHandler(self.handle_callback_query))
             
