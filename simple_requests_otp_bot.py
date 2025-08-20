@@ -369,17 +369,43 @@ class SimpleRequestsOTPBot:
             from telegram.constants import ParseMode
             
             bot = telegram.Bot(token=self.bot_token)
-            await bot.send_message(
-                chat_id=self.channel_id,
-                text=message,
-                parse_mode=ParseMode.MARKDOWN
-            )
-            logger.info("📢 Message sent to channel successfully")
-            return True
+            
+            # Try Markdown first, fallback to plain text if parsing fails
+            try:
+                await bot.send_message(
+                    chat_id=self.channel_id,
+                    text=message,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+                logger.info("📢 Message sent to channel with Markdown")
+                return True
+            except Exception as markdown_error:
+                logger.warning(f"⚠️ Markdown failed: {markdown_error}")
+                # Fallback to plain text
+                try:
+                    await bot.send_message(
+                        chat_id=self.channel_id,
+                        text=message
+                    )
+                    logger.info("📢 Message sent to channel as plain text")
+                    return True
+                except Exception as plain_error:
+                    logger.error(f"❌ Plain text also failed: {plain_error}")
+                    return False
             
         except Exception as e:
             logger.error(f"❌ Channel send error: {e}")
             return False
+
+    def escape_markdown(self, text: str) -> str:
+        """Escape special characters for Telegram Markdown"""
+        if not text:
+            return text
+        # Escape special markdown characters
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        for char in special_chars:
+            text = text.replace(char, f'\\{char}')
+        return text
 
     def format_channel_message(self, otp_data: Dict) -> str:
         """Format SMS data into original Telegram channel message format"""
@@ -410,23 +436,30 @@ class SimpleRequestsOTPBot:
             # Service name extraction (e.g., "Telegram", "WhatsApp")
             service_name = otp_data.get('service', 'Unknown')
             
-            # Make OTP clickable
+            # Clean and escape text for markdown safety
+            safe_timestamp = self.escape_markdown(str(timestamp))
+            safe_number = self.escape_markdown(str(number))
+            safe_country = self.escape_markdown(str(country))
+            safe_service = self.escape_markdown(str(service_name))
+            safe_message = str(message)  # Keep message unescaped for code block
+            
+            # Make OTP clickable (safe from escaping)
             clickable_otp = f"`{otp_code}`" if otp_code != 'Unknown' else 'Unknown'
             
-            # Original format from otp_telegram_bot.py
-            formatted_message = f"""🔔{country} {country_flag} {service_name} Otp Code Received Successfully.
+            # Original format with escaped text
+            formatted_message = f"""🔔{safe_country} {country_flag} {safe_service} Otp Code Received Successfully\\.
 
-⏰Time: {timestamp}
-📱Number: {number}
-🌍Country: {country} {country_flag}
-💬Service: {service_name}
+⏰Time: {safe_timestamp}
+📱Number: {safe_number}
+🌍Country: {safe_country} {country_flag}
+💬Service: {safe_service}
 🔐Otp Code: {clickable_otp}
 📝Message:
 ```
-{message}
+{safe_message}
 ```
 
-Powered by @tasktreasur_support"""
+Powered by @tasktreasur\\_support"""
             
             return formatted_message
             
