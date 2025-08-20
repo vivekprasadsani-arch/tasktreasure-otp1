@@ -12,7 +12,7 @@ import logging
 import re
 import pandas as pd
 from typing import Dict, List, Optional, Set
-from datetime import datetime
+from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 from supabase import create_client, Client
@@ -188,8 +188,30 @@ class TelegramNumberBot:
         """Check if user is admin"""
         return self.admin_user_id and user_id == self.admin_user_id
     
+    def add_number_to_cooldown(self, number: str):
+        """Add number to 3-day cooldown after receiving OTP"""
+        try:
+            if not self.supabase:
+                return
+            
+            # Remove any existing cooldown for this number
+            self.supabase.table('otp_cooldown').delete().eq('number', number).execute()
+            
+            # Add new cooldown
+            cooldown_data = {
+                'number': number,
+                'last_otp_at': datetime.now().isoformat(),
+                'cooldown_until': (datetime.now() + timedelta(days=3)).isoformat()
+            }
+            
+            self.supabase.table('otp_cooldown').insert(cooldown_data).execute()
+            logger.info(f"⏰ Number {number} added to 3-day cooldown")
+            
+        except Exception as e:
+            logger.error(f"❌ Error adding cooldown: {e}")
+
     async def log_otp_received(self, user_id: int, number: str, country: str, service: str, otp_code: str, message: str):
-        """Log OTP received for user statistics"""
+        """Log OTP received for user statistics and add number to cooldown"""
         try:
             if self.supabase:
                 data = {
@@ -203,6 +225,10 @@ class TelegramNumberBot:
                 }
                 self.supabase.table('otp_history').insert(data).execute()
                 logger.info(f"📊 OTP logged for user {user_id}: {service} - {otp_code}")
+                
+                # Add number to 3-day cooldown
+                self.add_number_to_cooldown(number)
+                
         except Exception as e:
             logger.error(f"❌ Error logging OTP: {e}")
     
@@ -278,51 +304,104 @@ class TelegramNumberBot:
             logger.error(f"❌ Error loading numbers for {country}: {e}")
             return []
     
+    def is_number_in_cooldown(self, number: str) -> bool:
+        """Check if number is in 3-day cooldown period"""
+        try:
+            if not self.supabase:
+                return False
+                
+            result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
+            
+            return len(result.data) > 0
+            
+        except Exception as e:
+            logger.error(f"❌ Error checking cooldown: {e}")
+            return False
+    
+    def is_number_currently_assigned(self, number: str) -> bool:
+        """Check if number is currently assigned to another user"""
+        try:
+            if not self.supabase:
+                return False
+                
+            result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
+            
+            return len(result.data) > 0
+            
+        except Exception as e:
+            logger.error(f"❌ Error checking assignment: {e}")
+            return False
+    
+    def assign_number_to_user(self, user_id: int, number: str, country: str) -> bool:
+        """Assign number to user with concurrent protection"""
+        try:
+            if not self.supabase:
+                return False
+            
+            # Double-check availability with database lock
+            if self.is_number_currently_assigned(number):
+                return False
+            
+            # Check cooldown
+            if self.is_number_in_cooldown(number):
+                return False
+            
+            # Deactivate any existing assignments for this user
+            self.supabase.table('number_assignments').update({'is_active': False}).eq('user_id', user_id).eq('is_active', True).execute()
+            
+            # Create new assignment
+            assignment_data = {
+                'user_id': user_id,
+                'number': number,
+                'country': country,
+                'assigned_at': datetime.now().isoformat(),
+                'expires_at': (datetime.now() + timedelta(hours=24)).isoformat(),  # 24 hour assignment
+                'is_active': True
+            }
+            
+            result = self.supabase.table('number_assignments').insert(assignment_data).execute()
+            
+            if result.data:
+                logger.info(f"✅ Number {number} assigned to user {user_id}")
+                return True
+            else:
+                logger.error(f"❌ Failed to assign number {number} to user {user_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"❌ Error assigning number: {e}")
+            return False
+
     def get_next_available_number(self, country: str, user_id: int) -> Optional[str]:
-        """Get next available number for a user"""
+        """Get next available number for a user with concurrent protection and cooldown check"""
         try:
             numbers = self.get_country_numbers(country)
             if not numbers:
                 return None
             
-            total_numbers = len(numbers)
-            current_index = self.country_number_indices.get(country, 0)
-            assigned = self.assigned_numbers.get(country, set())
+            # Shuffle numbers to distribute load and avoid conflicts
+            import random
+            random.shuffle(numbers)
             
-            # Find next available number
-            attempts = 0
-            while attempts < total_numbers:
-                number = numbers[current_index]
+            # Find available number
+            for number in numbers:
+                # Check if number is in cooldown
+                if self.is_number_in_cooldown(number):
+                    logger.info(f"⏰ Number {number} is in cooldown, skipping")
+                    continue
                 
-                # Check if number is already assigned
-                if number not in assigned:
-                    # Assign this number
-                    self.assigned_numbers[country].add(number)
-                    self.country_number_indices[country] = (current_index + 1) % total_numbers
-                    
-                    logger.info(f"📱 Assigned {number} from {country} to user {user_id}")
+                # Try to assign this number (with concurrent protection)
+                if self.assign_number_to_user(user_id, number, country):
+                    logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
                     return number
-                
-                # Move to next number
-                current_index = (current_index + 1) % total_numbers
-                attempts += 1
+                else:
+                    logger.info(f"🔒 Number {number} already assigned, trying next")
             
-            # All numbers assigned, reset and start from beginning
-            logger.warning(f"⚠️ All numbers assigned for {country}, resetting...")
-            self.assigned_numbers[country].clear()
-            self.country_number_indices[country] = 0
-            
-            # Get first number after reset
-            if numbers:
-                number = numbers[0]
-                self.assigned_numbers[country].add(number)
-                self.country_number_indices[country] = 1
-                return number
-            
-            return None
+            logger.warning(f"⚠️ No available numbers for {country} (all in use or cooldown)")
+            return None  # No available numbers
             
         except Exception as e:
-            logger.error(f"❌ Error getting number for {country}: {e}")
+            logger.error(f"❌ Error getting available number: {e}")
             return None
     
     def release_number(self, country: str, number: str):
