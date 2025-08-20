@@ -45,6 +45,10 @@ class SimpleRequestsOTPBot:
         self.failure_count = 0
         self.max_hashes = 1000
         
+        # Telegram bot for channel messages
+        self.bot_token = os.getenv('BOT_TOKEN')
+        self.channel_id = "-1002724043027"
+        
         # Initialize number bot
         try:
             from telegram_number_bot import TelegramNumberBot
@@ -354,25 +358,55 @@ class SimpleRequestsOTPBot:
         """Generate hash for message"""
         return hashlib.md5(message.encode()).hexdigest()[:16]
     
+    async def send_to_channel_direct(self, message: str):
+        """Send message directly to Telegram channel"""
+        try:
+            if not self.bot_token:
+                logger.error("❌ No bot token available for channel sending")
+                return False
+                
+            import telegram
+            from telegram.constants import ParseMode
+            
+            bot = telegram.Bot(token=self.bot_token)
+            await bot.send_message(
+                chat_id=self.channel_id,
+                text=message,
+                parse_mode=ParseMode.MARKDOWN
+            )
+            logger.info("📢 Message sent to channel successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Channel send error: {e}")
+            return False
+
     async def notify_user_otp(self, otp_data: Dict):
         """Notify users about new OTP"""
         try:
-            if not self.number_bot:
-                return
+            # Channel notification - direct sending
+            channel_message = f"""🔔 **OTP Received**
+
+📱 Service: {otp_data['service']}
+🔢 Code: `{otp_data['otp_code']}`
+📞 Number: {otp_data['number']}
+⏰ Time: {otp_data['timestamp']}
+
+```
+{otp_data['message'][:100]}...
+```"""
             
-            # Channel notification
-            channel_message = f"🔔 **OTP Received**\n\n📱 Service: {otp_data['service']}\n🔢 Code: `{otp_data['otp_code']}`\n📞 Number: {otp_data['number']}\n⏰ Time: {otp_data['timestamp']}"
-            
-            await self.number_bot.send_to_channel(channel_message)
+            await self.send_to_channel_direct(channel_message)
             logger.info(f"📢 Channel notified: {otp_data['otp_code']}")
             
             # Individual user notifications
-            await self.number_bot.notify_user_otp(
-                otp_data['number'], 
-                otp_data['otp_code'], 
-                otp_data['service'], 
-                otp_data['message']
-            )
+            if self.number_bot:
+                await self.number_bot.notify_user_otp(
+                    otp_data['number'], 
+                    otp_data['otp_code'], 
+                    otp_data['service'], 
+                    otp_data['message']
+                )
             
         except Exception as e:
             logger.error(f"❌ User notification error: {e}")
