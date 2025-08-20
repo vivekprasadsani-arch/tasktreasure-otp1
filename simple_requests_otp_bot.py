@@ -189,19 +189,19 @@ class SimpleRequestsOTPBot:
             return False
     
     def check_for_messages(self) -> List[Dict]:
-        """Check for messages using requests with logout detection"""
+        """Check for messages using AJAX endpoint with logout detection"""
         try:
             if not self.logged_in:
                 return []
             
-            # Get SMS page
-            response = self.session.get(self.sms_url, timeout=30)
-            if response.status_code != 200:
-                logger.warning(f"⚠️ SMS page failed: {response.status_code}")
+            # First check if we're still logged in by accessing SMS page
+            check_response = self.session.get(self.sms_url, timeout=15)
+            if check_response.status_code != 200:
+                logger.warning(f"⚠️ SMS page failed: {check_response.status_code}")
                 return []
             
             # 🔍 LOGOUT DETECTION: Check if URL changed (redirected to login)
-            final_url = response.url
+            final_url = check_response.url
             if "login" in final_url.lower() or "signin" in final_url.lower():
                 logger.warning(f"🔓 LOGOUT DETECTED! Redirected to: {final_url}")
                 logger.info("🔄 Attempting automatic re-login...")
@@ -210,16 +210,13 @@ class SimpleRequestsOTPBot:
                 # Attempt re-login
                 if self.login_once():
                     logger.info("✅ Re-login successful, retrying message check...")
-                    # Retry message check after re-login
                     return self.check_for_messages()
                 else:
                     logger.error("❌ Re-login failed")
                     return []
             
-            # Parse HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Check if we're actually on the SMS page (not login page)
+            # Check page title for logout detection
+            soup = BeautifulSoup(check_response.text, 'html.parser')
             page_title = soup.find('title')
             if page_title and "login" in page_title.get_text().lower():
                 logger.warning("🔓 LOGOUT DETECTED! On login page")
@@ -233,38 +230,85 @@ class SimpleRequestsOTPBot:
                     logger.error("❌ Re-login failed")
                     return []
             
-            # Find SMS table
-            table = soup.find('table')
-            if not table:
-                logger.warning("⚠️ No table found on SMS page")
+            # 🚀 USE AJAX ENDPOINT FOR REAL DATA
+            from datetime import datetime
+            today = datetime.now().strftime('%Y-%m-%d')
+            
+            ajax_url = "http://94.23.120.156/ints/client/res/data_smscdr.php"
+            
+            # DataTables headers for AJAX request
+            headers = {
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': 'http://94.23.120.156/ints/client/SMSCDRStats',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            }
+            
+            # AJAX parameters
+            params = {
+                'fdate1': f'{today} 00:00:00',
+                'fdate2': f'{today} 23:59:59',
+                'frange': '',
+                'fnum': '',
+                'fcli': '',
+                'fgdate': '',
+                'fgmonth': '',
+                'fgrange': '',
+                'fgnumber': '',
+                'fgcli': '',
+                'fg': '0',
+                'draw': '1',
+                'start': '0',
+                'length': '100',
+                'search[value]': '',
+                'search[regex]': 'false',
+                '_': str(int(datetime.now().timestamp() * 1000))
+            }
+            
+            # Make AJAX request
+            response = self.session.post(ajax_url, data=params, headers=headers, timeout=15)
+            
+            if response.status_code != 200:
+                logger.warning(f"⚠️ AJAX request failed: {response.status_code}")
                 return []
             
-            messages = []
-            rows = table.find_all('tr')[1:]  # Skip header
-            
-            for row in rows:
-                cells = row.find_all('td')
-                if len(cells) >= 4:
-                    try:
-                        # Extract message data
-                        timestamp = cells[0].get_text(strip=True)
-                        number = cells[1].get_text(strip=True)
-                        service = cells[2].get_text(strip=True)
-                        message = cells[3].get_text(strip=True)
-                        
-                        if message and len(message) > 10:  # Valid message
-                            messages.append({
-                                'timestamp': timestamp,
-                                'number': number,
-                                'service': service,
-                                'message': message
-                            })
-                    except Exception as parse_error:
-                        logger.warning(f"⚠️ Row parse error: {parse_error}")
-                        continue
-            
-            logger.info(f"📊 Found {len(messages)} messages")
-            return messages
+            # Parse JSON response
+            try:
+                data = response.json()
+                sms_records = data.get('aaData', [])
+                
+                messages = []
+                for record in sms_records:
+                    if isinstance(record, list) and len(record) >= 5:
+                        # Skip summary rows (like ['0,0,0,1', 0, 0, 0, 0, 0, 0])
+                        if isinstance(record[0], str) and ',' in record[0]:
+                            continue
+                            
+                        try:
+                            timestamp = str(record[0])
+                            service_range = str(record[1])  # Service description
+                            number = str(record[2])
+                            service = str(record[3])        # Service name
+                            message = str(record[4])
+                            
+                            if message and len(message) > 10 and 'code' in message.lower():
+                                messages.append({
+                                    'timestamp': timestamp,
+                                    'number': number,
+                                    'service': service,
+                                    'message': message,
+                                    'service_range': service_range
+                                })
+                        except Exception as parse_error:
+                            logger.warning(f"⚠️ AJAX record parse error: {parse_error}")
+                            continue
+                
+                logger.info(f"📊 Found {len(messages)} messages via AJAX")
+                return messages
+                
+            except Exception as json_error:
+                logger.error(f"❌ AJAX JSON parse error: {json_error}")
+                return []
             
         except Exception as e:
             logger.error(f"❌ Message check error: {e}")
