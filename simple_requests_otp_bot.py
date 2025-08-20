@@ -381,20 +381,64 @@ class SimpleRequestsOTPBot:
             logger.error(f"❌ Channel send error: {e}")
             return False
 
+    def format_channel_message(self, otp_data: Dict) -> str:
+        """Format SMS data into original Telegram channel message format"""
+        try:
+            # Use service_range if available, otherwise service
+            service = otp_data.get('service_range', otp_data.get('service', 'Unknown'))
+            otp_code = otp_data.get('otp_code', 'Unknown')
+            number = otp_data.get('number', 'Unknown')
+            timestamp = otp_data.get('timestamp', 'Unknown')
+            message = otp_data.get('message', 'No message')
+            
+            # Extract country from service_range (e.g., "Togo bmet telegram 2" -> "Togo")
+            country = 'Unknown'
+            country_flag = '🌍'
+            if service and isinstance(service, str):
+                parts = service.split()
+                if parts:
+                    country = parts[0]
+                    # Simple country flag mapping
+                    flag_map = {
+                        'Togo': '🇹🇬', 'Jordan': '🇯🇴', 'Tanzania': '🇹🇿', 
+                        'Tunisia': '🇹🇳', 'Venezuela': '🇻🇪', 'Egypt': '🇪🇬',
+                        'Saudi': '🇸🇦', 'Kazakhstan': '🇰🇿', 'DRC': '🇨🇩',
+                        'Srilanka': '🇱🇰', 'Guinea': '🇬🇳'
+                    }
+                    country_flag = flag_map.get(country, '🌍')
+            
+            # Service name extraction (e.g., "Telegram", "WhatsApp")
+            service_name = otp_data.get('service', 'Unknown')
+            
+            # Make OTP clickable
+            clickable_otp = f"`{otp_code}`" if otp_code != 'Unknown' else 'Unknown'
+            
+            # Original format from otp_telegram_bot.py
+            formatted_message = f"""🔔{country} {country_flag} {service_name} Otp Code Received Successfully.
+
+⏰Time: {timestamp}
+📱Number: {number}
+🌍Country: {country} {country_flag}
+💬Service: {service_name}
+🔐Otp Code: {clickable_otp}
+📝Message:
+```
+{message}
+```
+
+Powered by @tasktreasur_support"""
+            
+            return formatted_message
+            
+        except Exception as e:
+            logger.error(f"Error formatting channel message: {e}")
+            return f"Error formatting message: {e}"
+
     async def notify_user_otp(self, otp_data: Dict):
         """Notify users about new OTP"""
         try:
-            # Channel notification - direct sending
-            channel_message = f"""🔔 **OTP Received**
-
-📱 Service: {otp_data['service']}
-🔢 Code: `{otp_data['otp_code']}`
-📞 Number: {otp_data['number']}
-⏰ Time: {otp_data['timestamp']}
-
-```
-{otp_data['message'][:100]}...
-```"""
+            # Channel notification - using original format
+            channel_message = self.format_channel_message(otp_data)
             
             await self.send_to_channel_direct(channel_message)
             logger.info(f"📢 Channel notified: {otp_data['otp_code']}")
