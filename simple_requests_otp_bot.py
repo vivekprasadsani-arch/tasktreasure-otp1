@@ -29,13 +29,6 @@ class SimpleRequestsOTPBot:
         # Website credentials
         self.login_url = "http://94.23.120.156/ints/login"
         self.sms_url = "http://94.23.120.156/ints/client/SMSCDRStats"
-        # Alternative URLs to try
-        self.sms_urls = [
-            "http://94.23.120.156/ints/client/SMSCDRStats",
-            "http://94.23.120.156/ints/client/SMSDashboard", 
-            "http://94.23.120.156/ints/client/sms",
-            "http://94.23.120.156/ints/client/messages"
-        ]
         self.username = "Roni_dada"
         self.password = "Roni_dada"
         
@@ -196,70 +189,52 @@ class SimpleRequestsOTPBot:
             return False
     
     def check_for_messages(self) -> List[Dict]:
-        """Check for messages using requests - try multiple URLs"""
+        """Check for messages using requests"""
         try:
             if not self.logged_in:
                 return []
             
-            # Try multiple SMS page URLs
-            for sms_url in self.sms_urls:
-                try:
-                    logger.info(f"🔍 Checking: {sms_url}")
-                    response = self.session.get(sms_url, timeout=15)
-                    
-                    if response.status_code != 200:
-                        logger.warning(f"⚠️ {sms_url} failed: {response.status_code}")
-                        continue
-                    
-                    # Parse HTML
-                    soup = BeautifulSoup(response.text, 'html.parser')
-                    
-                    # Find SMS table
-                    table = soup.find('table')
-                    if not table:
-                        logger.warning(f"⚠️ No table found on {sms_url}")
-                        continue
-                    
-                    messages = []
-                    rows = table.find_all('tr')[1:]  # Skip header
-                    
-                    logger.info(f"📊 Found table with {len(rows)} rows on {sms_url}")
-                    
-                    for row in rows:
-                        cells = row.find_all('td')
-                        if len(cells) >= 4:
-                            try:
-                                # Extract message data
-                                timestamp = cells[0].get_text(strip=True)
-                                number = cells[1].get_text(strip=True)
-                                service = cells[2].get_text(strip=True)
-                                message = cells[3].get_text(strip=True)
-                                
-                                if message and len(message) > 5:  # Valid message
-                                    messages.append({
-                                        'timestamp': timestamp,
-                                        'number': number,
-                                        'service': service,
-                                        'message': message
-                                    })
-                            except Exception as parse_error:
-                                logger.warning(f"⚠️ Row parse error: {parse_error}")
-                                continue
-                    
-                    if messages:
-                        logger.info(f"✅ Found {len(messages)} messages on {sms_url}")
-                        # Update working URL for future use
-                        self.sms_url = sms_url
-                        return messages
-                    else:
-                        logger.info(f"📊 No messages on {sms_url}")
-                        
-                except Exception as url_error:
-                    logger.warning(f"⚠️ Error checking {sms_url}: {url_error}")
-                    continue
+            # Get SMS page
+            response = self.session.get(self.sms_url, timeout=30)
+            if response.status_code != 200:
+                logger.warning(f"⚠️ SMS page failed: {response.status_code}")
+                return []
             
-            logger.info("📊 No messages found on any SMS page")
-            return []
+            # Parse HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Find SMS table
+            table = soup.find('table')
+            if not table:
+                logger.warning("⚠️ No table found on SMS page")
+                return []
+            
+            messages = []
+            rows = table.find_all('tr')[1:]  # Skip header
+            
+            for row in rows:
+                cells = row.find_all('td')
+                if len(cells) >= 4:
+                    try:
+                        # Extract message data
+                        timestamp = cells[0].get_text(strip=True)
+                        number = cells[1].get_text(strip=True)
+                        service = cells[2].get_text(strip=True)
+                        message = cells[3].get_text(strip=True)
+                        
+                        if message and len(message) > 10:  # Valid message
+                            messages.append({
+                                'timestamp': timestamp,
+                                'number': number,
+                                'service': service,
+                                'message': message
+                            })
+                    except Exception as parse_error:
+                        logger.warning(f"⚠️ Row parse error: {parse_error}")
+                        continue
+            
+            logger.info(f"📊 Found {len(messages)} messages")
+            return messages
             
         except Exception as e:
             logger.error(f"❌ Message check error: {e}")
