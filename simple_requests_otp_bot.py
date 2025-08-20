@@ -292,8 +292,11 @@ class SimpleRequestsOTPBot:
                             timestamp = str(record[0])
                             service_range = str(record[1])  # Service description
                             number = str(record[2])
-                            service = str(record[3])        # Service name
+                            service = str(record[3])        # Service name (CLI column)
                             message = str(record[4])
+                            
+                            # Debug: Log CLI column value
+                            logger.info(f"🔍 CLI Column (Service): '{service}' for number {number}")
                             
                             if message and len(message) > 10 and 'code' in message.lower():
                                 messages.append({
@@ -593,34 +596,29 @@ class SimpleRequestsOTPBot:
             country = country_info['name']
             country_flag = country_info['flag']
             
-            # Extract service name from service_range (e.g., "Togo bmet telegram 2" -> "Telegram")
-            service_range = otp_data.get('service_range', '')
-            service_name = 'Unknown'
+            # Extract service name from CLI column (record[3])
+            # CLI column contains the actual service name like "Telegram", "WhatsApp", etc.
+            service_name = otp_data.get('service', 'Unknown')
             
-            if service_range and isinstance(service_range, str):
-                # Look for common service names in service_range
-                service_range_lower = service_range.lower()
-                if 'telegram' in service_range_lower:
+            # Clean up service name if needed
+            if service_name and isinstance(service_name, str) and service_name != 'Unknown':
+                # Capitalize first letter for consistency
+                service_name = service_name.strip().capitalize()
+                
+                # Handle common variations
+                service_lower = service_name.lower()
+                if 'telegram' in service_lower:
                     service_name = 'Telegram'
-                elif 'whatsapp' in service_range_lower:
+                elif 'whatsapp' in service_lower:
                     service_name = 'WhatsApp'
-                elif 'facebook' in service_range_lower:
+                elif 'facebook' in service_lower:
                     service_name = 'Facebook'
-                elif 'instagram' in service_range_lower:
+                elif 'instagram' in service_lower:
                     service_name = 'Instagram'
-                elif 'google' in service_range_lower:
+                elif 'google' in service_lower:
                     service_name = 'Google'
-                elif 'twitter' in service_range_lower:
+                elif 'twitter' in service_lower:
                     service_name = 'Twitter'
-                elif 'linkedin' in service_range_lower:
-                    service_name = 'LinkedIn'
-                elif 'uber' in service_range_lower:
-                    service_name = 'Uber'
-                elif 'netflix' in service_range_lower:
-                    service_name = 'Netflix'
-                else:
-                    # Fallback to service field if available
-                    service_name = otp_data.get('service', 'Unknown')
             
             # Clean and escape text for markdown safety
             safe_timestamp = self.escape_markdown(str(timestamp))
