@@ -189,7 +189,7 @@ class SimpleRequestsOTPBot:
             return False
     
     def check_for_messages(self) -> List[Dict]:
-        """Check for messages using requests"""
+        """Check for messages using requests with logout detection"""
         try:
             if not self.logged_in:
                 return []
@@ -200,8 +200,38 @@ class SimpleRequestsOTPBot:
                 logger.warning(f"⚠️ SMS page failed: {response.status_code}")
                 return []
             
+            # 🔍 LOGOUT DETECTION: Check if URL changed (redirected to login)
+            final_url = response.url
+            if "login" in final_url.lower() or "signin" in final_url.lower():
+                logger.warning(f"🔓 LOGOUT DETECTED! Redirected to: {final_url}")
+                logger.info("🔄 Attempting automatic re-login...")
+                self.logged_in = False
+                
+                # Attempt re-login
+                if self.login_once():
+                    logger.info("✅ Re-login successful, retrying message check...")
+                    # Retry message check after re-login
+                    return self.check_for_messages()
+                else:
+                    logger.error("❌ Re-login failed")
+                    return []
+            
             # Parse HTML
             soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Check if we're actually on the SMS page (not login page)
+            page_title = soup.find('title')
+            if page_title and "login" in page_title.get_text().lower():
+                logger.warning("🔓 LOGOUT DETECTED! On login page")
+                logger.info("🔄 Attempting automatic re-login...")
+                self.logged_in = False
+                
+                if self.login_once():
+                    logger.info("✅ Re-login successful, retrying message check...")
+                    return self.check_for_messages()
+                else:
+                    logger.error("❌ Re-login failed")
+                    return []
             
             # Find SMS table
             table = soup.find('table')
