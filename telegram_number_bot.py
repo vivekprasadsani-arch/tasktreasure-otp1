@@ -503,20 +503,30 @@ Hi {user_name}! 👋
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        message_text = f"""
-🔄 **Number Changed Successfully!**
+        # Get both formatted and copy-friendly versions
+        formatted_display = self.format_phone_number(new_number, country)
+        copy_friendly = self.get_copy_friendly_number(new_number)
+        
+        message_text = f"""🔄 **Number Changed Successfully!**
 
 🌍 **Country:** {country}
-📞 **New Number:** `{new_number}`
+📞 **Display:** {formatted_display}
+📋 **Copy Number:** `{copy_friendly}`
 ⏰ **Changed At:** {datetime.now().strftime('%H:%M:%S')}
 
-🎯 **Status:** Waiting for OTP...
-⚡ You will receive OTP codes for this new number!
+🎯 **Status:** ✅ Waiting for OTP...
+⚡ **Auto-Notification:** You'll receive OTP codes instantly!
+
+💡 **Instructions:**
+• Click the number above to copy it
+• Use this number to receive OTP codes
+• Get instant notifications when OTP arrives
 """
         
         await query.edit_message_text(
             message_text,
-            reply_markup=reply_markup
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
         )
         
         # Save updated session
@@ -845,6 +855,21 @@ From: TaskTreasure Support Team
         except Exception as e:
             logger.error(f"❌ Error saving session: {e}")
     
+    async def send_to_channel(self, message: str):
+        """Send message to Telegram channel"""
+        try:
+            if hasattr(self, 'application') and self.application:
+                await self.application.bot.send_message(
+                    chat_id=self.channel_id,
+                    text=message,
+                    parse_mode='Markdown'
+                )
+                logger.info("📢 Message sent to channel")
+            else:
+                logger.warning("⚠️ Bot application not initialized, cannot send to channel")
+        except Exception as e:
+            logger.error(f"❌ Channel send error: {e}")
+
     async def notify_user_otp(self, number: str, otp_code: str, service: str, full_message: str):
         """Notify user when OTP arrives for their number"""
         try:

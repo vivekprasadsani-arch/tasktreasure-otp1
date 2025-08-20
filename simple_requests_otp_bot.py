@@ -367,7 +367,12 @@ class SimpleRequestsOTPBot:
             logger.info(f"📢 Channel notified: {otp_data['otp_code']}")
             
             # Individual user notifications
-            await self.number_bot.notify_user_otp(otp_data)
+            await self.number_bot.notify_user_otp(
+                otp_data['number'], 
+                otp_data['otp_code'], 
+                otp_data['service'], 
+                otp_data['message']
+            )
             
         except Exception as e:
             logger.error(f"❌ User notification error: {e}")
