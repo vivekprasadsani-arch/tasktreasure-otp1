@@ -120,7 +120,7 @@ class TelegramNumberBot:
             if admin_user_env:
                 self.admin_user_id = int(admin_user_env)
                 logger.info(f"✅ Admin user loaded from environment: {self.admin_user_id}")
-                return
+                    return
             
             # Fallback to database
             if self.supabase:
@@ -150,14 +150,14 @@ class TelegramNumberBot:
             # Format with spaces for readability
             if len(clean_number) > 10:
                 # International format: +XX XXX XXX XXXX
-                return f"{clean_number[:3]} {clean_number[3:6]} {clean_number[6:9]} {clean_number[9:]}"
+                    return f"{clean_number[:3]} {clean_number[3:6]} {clean_number[6:9]} {clean_number[9:]}"
             else:
                 # Shorter numbers: +XX XXXX XXXX
-                return f"{clean_number[:3]} {clean_number[3:7]} {clean_number[7:]}"
+                    return f"{clean_number[:3]} {clean_number[3:7]} {clean_number[7:]}"
                 
         except Exception as e:
             logger.warning(f"⚠️ Number formatting error: {e}")
-            return number  # Return original if formatting fails
+                return number  # Return original if formatting fails
     
     def get_copy_friendly_number(self, number: str) -> str:
         """Get clean number for copy-paste without spaces"""
@@ -170,11 +170,11 @@ class TelegramNumberBot:
                 if len(clean_number) > 7:
                     clean_number = '+' + clean_number
             
-            return clean_number
+                return clean_number
                 
         except Exception as e:
             logger.warning(f"⚠️ Copy-friendly format error: {e}")
-            return number
+                return number
     
     def load_user_sessions_from_db(self):
         """Load active user sessions from database on bot restart"""
@@ -202,44 +202,44 @@ class TelegramNumberBot:
     
     def is_admin(self, user_id: int) -> bool:
         """Check if user is admin"""
-        return self.admin_user_id and user_id == self.admin_user_id
+            return self.admin_user_id and user_id == self.admin_user_id
     
     async def is_user_approved(self, user_id: int) -> bool:
         """Check if user is approved to use the bot"""
         try:
             if self.is_admin(user_id):
-                return True
+                    return True
             
             if not self.supabase:
-                return False
+                    return False
             
             result = self.supabase.table('approved_users').select('*').eq('user_id', user_id).eq('is_active', True).execute()
-            return len(result.data) > 0
+                return len(result.data) > 0
         except Exception as e:
             logger.error(f"❌ Error checking user approval: {e}")
-            return False
+                return False
     
     async def check_request_cooldown(self, user_id: int) -> Optional[datetime]:
         """Check if user is in cooldown period, returns cooldown end time if in cooldown"""
         try:
             if not self.supabase:
-                return None
+                    return None
             
             result = self.supabase.table('user_approval_requests').select('next_request_allowed_at').eq('user_id', user_id).execute()
             if result.data:
                 cooldown_end = datetime.fromisoformat(result.data[0]['next_request_allowed_at'].replace('Z', '+00:00'))
                 if cooldown_end > datetime.now():
-                    return cooldown_end
-            return None
+                        return cooldown_end
+                return None
         except Exception as e:
             logger.error(f"❌ Error checking request cooldown: {e}")
-            return None
+                return None
     
     async def create_approval_request(self, user_id: int, user_data: dict):
         """Create a new approval request"""
         try:
             if not self.supabase:
-                return False
+                    return False
             
             # Set next allowed request time (3 hours from now)
             next_allowed = datetime.now() + timedelta(hours=3)
@@ -256,10 +256,10 @@ class TelegramNumberBot:
             # Upsert the request
             result = self.supabase.table('user_approval_requests').upsert(request_data, on_conflict='user_id').execute()
             logger.info(f"📝 Created approval request for user {user_id}")
-            return True
+                return True
         except Exception as e:
             logger.error(f"❌ Error creating approval request: {e}")
-            return False
+                return False
     
     async def notify_admin_new_request(self, user_id: int, user_data: dict):
         """Notify admin about new user request"""
@@ -270,17 +270,17 @@ class TelegramNumberBot:
             
             if not self.admin_user_id:
                 logger.error("❌ Admin user ID not set - cannot send notification")
-                return
+                    return
                 
             if not self.application:
                 logger.error("❌ Bot application not available - cannot send notification")
-                return
+                    return
             
             # Escape HTML special characters
             def escape_html(text):
                 if not text:
-                    return "N/A"
-                return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+                        return "N/A"
+                    return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             
             first_name = escape_html(user_data.get('first_name', 'N/A'))
             last_name = escape_html(user_data.get('last_name', ''))
@@ -327,7 +327,7 @@ class TelegramNumberBot:
 
 Choose an action:"""
                 
-                keyboard = [
+                    keyboard = [
                     [
                         InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
                         InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
@@ -349,12 +349,12 @@ Choose an action:"""
         """Approve user access"""
         try:
             if not self.supabase:
-                return False
+                    return False
             
             # Get user request data
             request_result = self.supabase.table('user_approval_requests').select('*').eq('user_id', user_id).execute()
             if not request_result.data:
-                return False
+                    return False
             
             request_data = request_result.data[0]
             
@@ -376,16 +376,16 @@ Choose an action:"""
             }).eq('user_id', user_id).execute()
             
             logger.info(f"✅ User {user_id} approved by admin {admin_id}")
-            return True
+                return True
         except Exception as e:
             logger.error(f"❌ Error approving user: {e}")
-            return False
+                return False
     
     async def reject_user(self, user_id: int, admin_id: int, reason: str = "Request rejected"):
         """Reject user access"""
         try:
             if not self.supabase:
-                return False
+                    return False
             
             # Update request status
             self.supabase.table('user_approval_requests').update({
@@ -395,16 +395,16 @@ Choose an action:"""
             }).eq('user_id', user_id).execute()
             
             logger.info(f"❌ User {user_id} rejected by admin {admin_id}")
-            return True
+                return True
         except Exception as e:
             logger.error(f"❌ Error rejecting user: {e}")
-            return False
+                return False
     
     async def notify_user_approval_result(self, user_id: int, approved: bool, reason: str = None):
         """Notify user about approval/rejection result"""
         try:
             if not self.application:
-                return
+                    return
             
             if approved:
                 message = """
@@ -422,11 +422,11 @@ You can now use the bot to get phone numbers and receive OTP codes.
 <b>Choose an option from the menu below:</b>
 """
                 # Create main menu keyboard
-                keyboard = [
+                    keyboard = [
                     [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
                     [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
                 ]
-                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             else:
                 reason_escaped = reason.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') if reason else 'No specific reason provided'
                 message = f"""
@@ -456,7 +456,7 @@ If you believe this is a mistake, please contact the administrator.
         """Add number to 3-day cooldown after receiving OTP"""
         try:
             if not self.supabase:
-                return
+                    return
             
             # Remove any existing cooldown for this number
             self.supabase.table('otp_cooldown').delete().eq('number', number).execute()
@@ -508,7 +508,7 @@ If you believe this is a mistake, please contact the administrator.
                 
                 if stats_result.data:
                     stats = stats_result.data[0]
-                    return {
+                        return {
                         'total_otps': stats.get('total_otps', 0),
                         'unique_services': stats.get('unique_services', 0),
                         'unique_countries': stats.get('unique_countries', 0),
@@ -517,7 +517,7 @@ If you believe this is a mistake, please contact the administrator.
                         'recent_otps': recent_result.data
                     }
                 else:
-                    return {
+                        return {
                         'total_otps': 0,
                         'unique_services': 0,
                         'unique_countries': 0,
@@ -527,18 +527,18 @@ If you believe this is a mistake, please contact the administrator.
                     }
         except Exception as e:
             logger.error(f"❌ Error getting OTP stats: {e}")
-            return {'total_otps': 0, 'unique_services': 0, 'unique_countries': 0, 'recent_otps': []}
+                return {'total_otps': 0, 'unique_services': 0, 'unique_countries': 0, 'recent_otps': []}
     
     async def get_all_users(self) -> list:
         """Get all users who have used the bot"""
         try:
             if self.supabase:
                 result = self.supabase.table('user_sessions').select('user_id').execute()
-                return list(set([session['user_id'] for session in result.data]))
-            return []
+                    return list(set([session['user_id'] for session in result.data]))
+                return []
         except Exception as e:
             logger.error(f"❌ Error getting all users: {e}")
-            return []
+                return []
     
     def get_country_numbers(self, country: str) -> List[str]:
         """Get all numbers from a country XLSX file"""
@@ -562,53 +562,53 @@ If you believe this is a mistake, please contact the administrator.
                         numbers.append(clean_number)
             
             logger.info(f"📞 Loaded {len(numbers)} numbers for {country}")
-            return numbers
+                return numbers
             
         except Exception as e:
             logger.error(f"❌ Error loading numbers for {country}: {e}")
-            return []
+                return []
     
     def is_number_in_cooldown(self, number: str) -> bool:
         """Check if number is in 3-day cooldown period"""
         try:
             if not self.supabase:
-                return False
+                    return False
                 
             result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
             
-            return len(result.data) > 0
+                return len(result.data) > 0
             
         except Exception as e:
             logger.error(f"❌ Error checking cooldown: {e}")
-            return False
+                return False
     
     def is_number_currently_assigned(self, number: str) -> bool:
         """Check if number is currently assigned to another user"""
         try:
             if not self.supabase:
-                return False
+                    return False
                 
             result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
             
-            return len(result.data) > 0
+                return len(result.data) > 0
             
         except Exception as e:
             logger.error(f"❌ Error checking assignment: {e}")
-            return False
+                return False
     
     def assign_number_to_user(self, user_id: int, number: str, country: str) -> bool:
         """Assign number to user with concurrent protection"""
         try:
             if not self.supabase:
-                return False
+                    return False
             
             # Double-check availability with database lock
             if self.is_number_currently_assigned(number):
-                return False
+                    return False
             
             # Check cooldown
             if self.is_number_in_cooldown(number):
-                return False
+                    return False
             
             # Deactivate any existing assignments for this user
             self.supabase.table('number_assignments').update({'is_active': False}).eq('user_id', user_id).eq('is_active', True).execute()
@@ -627,21 +627,21 @@ If you believe this is a mistake, please contact the administrator.
             
             if result.data:
                 logger.info(f"✅ Number {number} assigned to user {user_id}")
-                return True
+                    return True
             else:
                 logger.error(f"❌ Failed to assign number {number} to user {user_id}")
-                return False
+                    return False
                 
         except Exception as e:
             logger.error(f"❌ Error assigning number: {e}")
-            return False
+                return False
 
     def get_next_available_number(self, country: str, user_id: int) -> Optional[str]:
         """Get next available number for a user with concurrent protection and cooldown check"""
         try:
             numbers = self.get_country_numbers(country)
             if not numbers:
-                return None
+                    return None
             
             # Shuffle numbers to distribute load and avoid conflicts
             import random
@@ -657,16 +657,16 @@ If you believe this is a mistake, please contact the administrator.
                 # Try to assign this number (with concurrent protection)
                 if self.assign_number_to_user(user_id, number, country):
                     logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
-                    return number
+                        return number
                 else:
                     logger.info(f"🔒 Number {number} already assigned, trying next")
             
             logger.warning(f"⚠️ No available numbers for {country} (all in use or cooldown)")
-            return None  # No available numbers
+                return None  # No available numbers
             
         except Exception as e:
             logger.error(f"❌ Error getting available number: {e}")
-            return None
+                return None
     
     def release_number(self, country: str, number: str):
         """Release a number back to available pool"""
@@ -688,11 +688,11 @@ If you believe this is a mistake, please contact the administrator.
         # Check if user is approved
         if await self.is_user_approved(user_id):
             # User is approved, show main menu
-        keyboard = [
+            keyboard = [
             [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
             [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
         ]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         
         welcome_message = f"""
 🤖 **Welcome to TaskTreasure OTP Bot** 🤖
@@ -711,11 +711,11 @@ Hi {user_name}! 👋
 **Choose an option from the menu below:**
 """
         
-        await update.message.reply_text(
+            await update.message.reply_text(
             welcome_message,
                 reply_markup=reply_markup
             )
-            return
+                return
         
         # Check if user is in cooldown
         cooldown_end = await self.check_request_cooldown(user_id)
@@ -737,15 +737,15 @@ You can submit a new request after the cooldown period ends.
 
 Please wait and try again later.
 """
-            await update.message.reply_text(cooldown_message)
-            return
+                await update.message.reply_text(cooldown_message)
+                return
         
         # User is not approved and not in cooldown - show request access option
-        keyboard = [
+            keyboard = [
             [KeyboardButton("🔑 Request Access")],
             [KeyboardButton("ℹ️ Help")]
         ]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
         
         request_message = f"""
 🤖 **Welcome to TaskTreasure OTP Bot** 🤖
@@ -767,7 +767,7 @@ To use this bot, you need admin approval first.
 **Click the button below to request access:**
 """
         
-        await update.message.reply_text(
+            await update.message.reply_text(
             request_message,
             reply_markup=reply_markup
         )
@@ -775,11 +775,11 @@ To use this bot, you need admin approval first.
     async def show_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show available countries"""
         if not self.available_countries:
-            await update.message.reply_text("❌ No countries available at the moment.")
-            return
+                await update.message.reply_text("❌ No countries available at the moment.")
+                return
         
         # Create inline keyboard for countries
-        keyboard = []
+            keyboard = []
         for i in range(0, len(self.available_countries), 2):
             row = []
             row.append(InlineKeyboardButton(
@@ -798,7 +798,7 @@ To use this bot, you need admin approval first.
         
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await update.message.reply_text(
+            await update.message.reply_text(
             "🌍 Choose a Country:\n\nSelect a country to get a phone number:",
             reply_markup=reply_markup
         )
@@ -818,7 +818,7 @@ To use this bot, you need admin approval first.
             await query.edit_message_text(
                 f"❌ Sorry, no numbers available for {country} right now.\n\nTry another country or contact support."
             )
-            return
+                return
         
         # Store user session
         self.user_sessions[user_id] = {
@@ -829,7 +829,7 @@ To use this bot, you need admin approval first.
         }
         
         # Create action buttons
-        keyboard = [
+            keyboard = [
             [InlineKeyboardButton("🔄 Change Number", callback_data=f"change_{country}")],
             [InlineKeyboardButton("🏠 Main Menu", callback_data="back_to_menu")]
         ]
@@ -888,7 +888,7 @@ To use this bot, you need admin approval first.
                 f"❌ Sorry, no more numbers available for {country}.\n\nAll numbers are currently in use.",
                 parse_mode='Markdown'
             )
-            return
+                return
         
         # Update session
         self.user_sessions[user_id] = {
@@ -899,7 +899,7 @@ To use this bot, you need admin approval first.
         }
         
         # Create action buttons
-        keyboard = [
+            keyboard = [
             [InlineKeyboardButton("🔄 Change Again", callback_data=f"change_{country}")],
             [InlineKeyboardButton("🏠 Main Menu", callback_data="back_to_menu")]
         ]
@@ -1001,7 +1001,7 @@ To use this bot, you need admin approval first.
 💡 **Tip:** OTP codes are delivered instantly and tracked automatically!
 """
         
-        await update.message.reply_text(status_message, parse_mode='Markdown')
+            await update.message.reply_text(status_message, parse_mode='Markdown')
     
     async def show_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Show help information"""
@@ -1043,24 +1043,24 @@ Contact: @tasktreasur_support
 Powered by TaskTreasure 🚀
 """
         
-        await update.message.reply_text(help_text)
+            await update.message.reply_text(help_text)
     
     async def admin_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to broadcast message to all users"""
         user_id = update.effective_user.id
         
         if not self.is_admin(user_id):
-            await update.message.reply_text("❌ You don't have permission to use this command.")
-            return
+                await update.message.reply_text("❌ You don't have permission to use this command.")
+                return
         
         # Check if message provided
         if not context.args:
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "📢 **Admin Broadcast Usage:**\n\n"
                 "`/broadcast Your message here`\n\n"
                 "This will send your message to all bot users."
             )
-            return
+                return
         
         # Get message
         broadcast_message = " ".join(context.args)
@@ -1069,11 +1069,11 @@ Powered by TaskTreasure 🚀
         all_users = await self.get_all_users()
         
         if not all_users:
-            await update.message.reply_text("❌ No users found to broadcast to.")
-            return
+                await update.message.reply_text("❌ No users found to broadcast to.")
+                return
         
         # Confirm broadcast
-        await update.message.reply_text(
+            await update.message.reply_text(
             f"📢 **Broadcasting to {len(all_users)} users...**\n\n"
             f"**Message:**\n{broadcast_message}"
         )
@@ -1106,7 +1106,7 @@ From: TaskTreasure Support Team
                 logger.warning(f"Failed to send to user {target_user}: {e}")
         
         # Report results
-        await update.message.reply_text(
+            await update.message.reply_text(
             f"✅ **Broadcast Complete!**\n\n"
             f"📤 **Sent:** {success_count} users\n"
             f"❌ **Failed:** {failed_count} users\n"
@@ -1118,8 +1118,8 @@ From: TaskTreasure Support Team
         user_id = update.effective_user.id
         
         if not self.is_admin(user_id):
-            await update.message.reply_text("❌ You don't have permission to use this command.")
-            return
+                await update.message.reply_text("❌ You don't have permission to use this command.")
+                return
         
         try:
             # Get overall stats
@@ -1167,48 +1167,48 @@ From: TaskTreasure Support Team
 🔧 **Admin ID:** {self.admin_user_id}
 """
                 
-                await update.message.reply_text(stats_message)
+                    await update.message.reply_text(stats_message)
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error getting stats: {e}")
+                await update.message.reply_text(f"❌ Error getting stats: {e}")
             logger.error(f"Admin stats error: {e}")
     
     async def admin_approve_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to approve a user"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if len(context.args) != 1:
-                await update.message.reply_text("Usage: /approve <user_id>")
-                return
+                    await update.message.reply_text("Usage: /approve <user_id>")
+                    return
             
             user_id_to_approve = int(context.args[0])
             admin_id = update.effective_user.id
             
             if await self.approve_user(user_id_to_approve, admin_id):
                 await self.notify_user_approval_result(user_id_to_approve, True)
-                await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
+                    await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
                 logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
             else:
-                await update.message.reply_text("❌ Error approving user. User may not exist or already approved.")
+                    await update.message.reply_text("❌ Error approving user. User may not exist or already approved.")
         except ValueError:
-            await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
+                await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin approve error: {e}")
     
     async def admin_reject_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to reject a user"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if len(context.args) < 1:
-                await update.message.reply_text("Usage: /reject <user_id> [reason]")
-                return
+                    await update.message.reply_text("Usage: /reject <user_id> [reason]")
+                    return
             
             user_id_to_reject = int(context.args[0])
             reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Request rejected by admin"
@@ -1216,32 +1216,32 @@ From: TaskTreasure Support Team
             
             if await self.reject_user(user_id_to_reject, admin_id, reason):
                 await self.notify_user_approval_result(user_id_to_reject, False, reason)
-                await update.message.reply_text(f"❌ User {user_id_to_reject} has been rejected.\nReason: {reason}")
+                    await update.message.reply_text(f"❌ User {user_id_to_reject} has been rejected.\nReason: {reason}")
                 logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject} via command")
             else:
-                await update.message.reply_text("❌ Error rejecting user. User may not exist.")
+                    await update.message.reply_text("❌ Error rejecting user. User may not exist.")
         except ValueError:
-            await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
+                await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin reject error: {e}")
     
     async def admin_remove_user(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to remove an approved user"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if len(context.args) != 1:
-                await update.message.reply_text("Usage: /remove <user_id>")
-                return
+                    await update.message.reply_text("Usage: /remove <user_id>")
+                    return
             
             user_id_to_remove = int(context.args[0])
             
             if not self.supabase:
-                await update.message.reply_text("❌ Database connection error.")
-                return
+                    await update.message.reply_text("❌ Database connection error.")
+                    return
             
             # Deactivate user
             result = self.supabase.table('approved_users').update({
@@ -1249,7 +1249,7 @@ From: TaskTreasure Support Team
             }).eq('user_id', user_id_to_remove).execute()
             
             if result.data:
-                await update.message.reply_text(f"✅ User {user_id_to_remove} has been removed from approved users.")
+                    await update.message.reply_text(f"✅ User {user_id_to_remove} has been removed from approved users.")
                 logger.info(f"🗑️ Admin {update.effective_user.id} removed user {user_id_to_remove}")
                 
                 # Notify user
@@ -1270,30 +1270,30 @@ If you believe this is a mistake, please contact the administrator.
                 except Exception:
                     pass  # User may have blocked the bot
             else:
-                await update.message.reply_text("❌ User not found in approved users list.")
+                    await update.message.reply_text("❌ User not found in approved users list.")
         except ValueError:
-            await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
+                await update.message.reply_text("❌ Invalid user ID. Please provide a valid number.")
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin remove error: {e}")
     
     async def admin_list_requests(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to list pending approval requests"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if not self.supabase:
-                await update.message.reply_text("❌ Database connection error.")
-                return
+                    await update.message.reply_text("❌ Database connection error.")
+                    return
             
             # Get pending requests
             result = self.supabase.table('user_approval_requests').select('*').eq('status', 'pending').order('requested_at', desc=True).execute()
             
             if not result.data:
-                await update.message.reply_text("📝 No pending approval requests.")
-                return
+                    await update.message.reply_text("📝 No pending approval requests.")
+                    return
             
             message = "📋 **Pending Approval Requests:**\n\n"
             for i, req in enumerate(result.data[:10], 1):  # Limit to 10 requests
@@ -1315,28 +1315,28 @@ If you believe this is a mistake, please contact the administrator.
             
             message += "Use /approve <user_id> or /reject <user_id> to handle requests."
             
-            await update.message.reply_text(message, parse_mode='Markdown')
+                await update.message.reply_text(message, parse_mode='Markdown')
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin list requests error: {e}")
     
     async def admin_list_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to list approved users"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if not self.supabase:
-                await update.message.reply_text("❌ Database connection error.")
-                return
+                    await update.message.reply_text("❌ Database connection error.")
+                    return
             
             # Get approved users
             result = self.supabase.table('approved_users').select('*').eq('is_active', True).order('approved_at', desc=True).execute()
             
             if not result.data:
-                await update.message.reply_text("👥 No approved users found.")
-                return
+                    await update.message.reply_text("👥 No approved users found.")
+                    return
             
             message = f"👥 **Approved Users ({len(result.data)}):**\n\n"
             for i, user in enumerate(result.data[:15], 1):  # Limit to 15 users
@@ -1358,16 +1358,16 @@ If you believe this is a mistake, please contact the administrator.
             
             message += "Use /remove <user_id> to remove a user's access."
             
-            await update.message.reply_text(message, parse_mode='Markdown')
+                await update.message.reply_text(message, parse_mode='Markdown')
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin list users error: {e}")
     
     async def admin_debug_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to show debug information"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             # Check system status
@@ -1400,11 +1400,11 @@ If you believe this is a mistake, please contact the administrator.
 • Notification System: {'✅ Ready' if self.admin_user_id and self.application else '❌ Not Ready'}
 """
             
-            await update.message.reply_text(debug_info, parse_mode='Markdown')
+                await update.message.reply_text(debug_info, parse_mode='Markdown')
             logger.info(f"🔧 Admin {update.effective_user.id} requested debug info")
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin debug error: {e}")
     
     def validate_excel_file(self, file_path: str, country_name: str) -> tuple[bool, str, int]:
@@ -1425,11 +1425,11 @@ If you believe this is a mistake, please contact the administrator.
                     break
             
             if not column_found:
-                return False, f"Excel file must have a column with phone numbers (e.g., 'number', 'phone', or 'mobile')", 0
+                    return False, f"Excel file must have a column with phone numbers (e.g., 'number', 'phone', or 'mobile')", 0
             
             # Check if file has data
             if len(df) == 0:
-                return False, "Excel file is empty", 0
+                    return False, "Excel file is empty", 0
             
             # Validate phone numbers format
             valid_numbers = 0
@@ -1442,16 +1442,16 @@ If you believe this is a mistake, please contact the administrator.
                         valid_numbers += 1
             
             if valid_numbers == 0:
-                return False, "No valid phone numbers found in the file", 0
+                    return False, "No valid phone numbers found in the file", 0
             
             success_rate = (valid_numbers / len(df)) * 100
             if success_rate < 50:
-                return False, f"Too many invalid numbers. Only {success_rate:.1f}% are valid (minimum 50% required)", valid_numbers
+                    return False, f"Too many invalid numbers. Only {success_rate:.1f}% are valid (minimum 50% required)", valid_numbers
             
-            return True, f"File validated successfully. Found {valid_numbers} valid numbers out of {len(df)} total.", valid_numbers
+                return True, f"File validated successfully. Found {valid_numbers} valid numbers out of {len(df)} total.", valid_numbers
             
         except Exception as e:
-            return False, f"Error reading Excel file: {str(e)}", 0
+                return False, f"Error reading Excel file: {str(e)}", 0
     
     def process_country_file(self, file_path: str, country_name: str) -> bool:
         """Process and save country Excel file"""
@@ -1488,7 +1488,7 @@ If you believe this is a mistake, please contact the administrator.
             if backup_path and os.path.exists(backup_path):
                 os.remove(backup_path)
             
-            return True
+                return True
             
         except Exception as e:
             logger.error(f"❌ Error processing country file: {e}")
@@ -1501,15 +1501,15 @@ If you believe this is a mistake, please contact the administrator.
                 except Exception:
                     pass
             
-            return False
+                return False
     
     async def admin_upload_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to upload country file"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
-        await update.message.reply_text("""
+            await update.message.reply_text("""
 📁 **Upload Country Numbers File**
 
 To upload a new country or update existing one:
@@ -1545,13 +1545,13 @@ number
     async def admin_list_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to list all available countries"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if not self.available_countries:
-                await update.message.reply_text("📁 No countries available.")
-                return
+                    await update.message.reply_text("📁 No countries available.")
+                    return
             
             message = f"🌍 **Available Countries ({len(self.available_countries)}):**\n\n"
             
@@ -1588,29 +1588,29 @@ number
             message += "• `/delete_country <name>` - Delete country file\n"
             message += "• `/reload_countries` - Reload country list"
             
-            await update.message.reply_text(message, parse_mode='Markdown')
+                await update.message.reply_text(message, parse_mode='Markdown')
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin list countries error: {e}")
     
     async def admin_delete_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to delete a country file"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             if len(context.args) != 1:
-                await update.message.reply_text("Usage: /delete_country <country_name>")
-                return
+                    await update.message.reply_text("Usage: /delete_country <country_name>")
+                    return
             
             country_name = context.args[0]
             file_path = os.path.join(self.countries_dir, f"{country_name}.xlsx")
             
             if not os.path.exists(file_path):
-                await update.message.reply_text(f"❌ Country '{country_name}' not found.")
-                return
+                    await update.message.reply_text(f"❌ Country '{country_name}' not found.")
+                    return
             
             # Check if country has active users
             active_users = 0
@@ -1619,8 +1619,8 @@ number
                     active_users += 1
             
             if active_users > 0:
-                await update.message.reply_text(f"⚠️ Cannot delete '{country_name}' - {active_users} users are currently using numbers from this country.")
-                return
+                    await update.message.reply_text(f"⚠️ Cannot delete '{country_name}' - {active_users} users are currently using numbers from this country.")
+                    return
             
             # Create backup before deletion
             backup_path = f"{file_path}.deleted_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1639,7 +1639,7 @@ number
             if country_name in self.assigned_numbers:
                 del self.assigned_numbers[country_name]
             
-            await update.message.reply_text(f"""
+                await update.message.reply_text(f"""
 ✅ **Country Deleted Successfully**
 
 🗑️ **Country:** {country_name}
@@ -1652,14 +1652,14 @@ The file has been backed up before deletion.
             logger.info(f"🗑️ Admin deleted country: {country_name}")
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin delete country error: {e}")
     
     async def admin_reload_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to reload countries from files"""
         if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-            return
+                await update.message.reply_text("❌ You are not authorized to use this command.")
+                return
         
         try:
             old_count = len(self.available_countries)
@@ -1670,7 +1670,7 @@ The file has been backed up before deletion.
             
             new_count = len(self.available_countries)
             
-            await update.message.reply_text(f"""
+                await update.message.reply_text(f"""
 🔄 **Countries Reloaded**
 
 📊 **Before:** {old_count} countries
@@ -1684,7 +1684,7 @@ The file has been backed up before deletion.
             logger.info(f"🔄 Admin reloaded countries: {old_count} → {new_count}")
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error: {e}")
+                await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin reload countries error: {e}")
     
     async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1693,21 +1693,21 @@ The file has been backed up before deletion.
         
         # Only admin can upload files
         if not self.is_admin(user_id):
-            await update.message.reply_text("❌ Only admin can upload country files.")
-            return
+                await update.message.reply_text("❌ Only admin can upload country files.")
+                return
         
         document = update.message.document
         caption = update.message.caption or ""
         
         # Check if it's an Excel file
         if not document.file_name.endswith(('.xlsx', '.xls')):
-            await update.message.reply_text("❌ Please upload an Excel file (.xlsx or .xls)")
-            return
+                await update.message.reply_text("❌ Please upload an Excel file (.xlsx or .xls)")
+                return
         
         # Get country name from caption
         country_name = caption.strip()
         if not country_name:
-            await update.message.reply_text("""
+                await update.message.reply_text("""
 ❌ **Country Name Required**
 
 Please add the country name as caption when sending the file.
@@ -1715,15 +1715,15 @@ Please add the country name as caption when sending the file.
 **Example:**
 Send Tunisia.xlsx with caption: "Tunisia"
 """)
-            return
+                return
         
         # Validate country name
         if not re.match(r'^[a-zA-Z\s]+$', country_name):
-            await update.message.reply_text("❌ Country name should only contain letters and spaces.")
-            return
+                await update.message.reply_text("❌ Country name should only contain letters and spaces.")
+                return
         
         try:
-            await update.message.reply_text("📥 **Processing file...** Please wait...")
+                await update.message.reply_text("📥 **Processing file...** Please wait...")
             
             # Download file
             file = await context.bot.get_file(document.file_id)
@@ -1742,8 +1742,8 @@ Send Tunisia.xlsx with caption: "Tunisia"
             
             if not is_valid:
                 os.unlink(temp_path)
-                await update.message.reply_text(f"❌ **File Validation Failed**\n\n{message}")
-                return
+                    await update.message.reply_text(f"❌ **File Validation Failed**\n\n{message}")
+                    return
             
             # Check if country exists
             country_exists = country_name in self.available_countries
@@ -1751,7 +1751,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
             
             # Process file
             if self.process_country_file(temp_path, country_name):
-                await update.message.reply_text(f"""
+                    await update.message.reply_text(f"""
 ✅ **Country {action} Successfully!**
 
 🌍 **Country:** {country_name}
@@ -1764,13 +1764,13 @@ Send Tunisia.xlsx with caption: "Tunisia"
                 
                 logger.info(f"📁 Admin uploaded country file: {country_name} ({valid_count} numbers)")
             else:
-                await update.message.reply_text("❌ Error processing file. Please try again.")
+                    await update.message.reply_text("❌ Error processing file. Please try again.")
             
             # Clean up temporary file
             os.unlink(temp_path)
             
         except Exception as e:
-            await update.message.reply_text(f"❌ Error processing file: {e}")
+                await update.message.reply_text(f"❌ Error processing file: {e}")
             logger.error(f"Document upload error: {e}")
             
             # Clean up on error
@@ -1789,8 +1789,8 @@ Send Tunisia.xlsx with caption: "Tunisia"
         if text == "🔑 Request Access":
             # Check if user is already approved
             if await self.is_user_approved(user_id):
-                await update.message.reply_text("✅ You are already approved! Use /start to access the main menu.")
-                return
+                    await update.message.reply_text("✅ You are already approved! Use /start to access the main menu.")
+                    return
             
             # Check cooldown
             cooldown_end = await self.check_request_cooldown(user_id)
@@ -1799,8 +1799,8 @@ Send Tunisia.xlsx with caption: "Tunisia"
                 hours = int(cooldown_remaining.total_seconds() // 3600)
                 minutes = int((cooldown_remaining.total_seconds() % 3600) // 60)
                 
-                await update.message.reply_text(f"⏰ You are in cooldown. Wait {hours}h {minutes}m before requesting again.")
-                return
+                    await update.message.reply_text(f"⏰ You are in cooldown. Wait {hours}h {minutes}m before requesting again.")
+                    return
             
             # Create approval request
             user_data = {
@@ -1812,7 +1812,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
             if await self.create_approval_request(user_id, user_data):
                 await self.notify_admin_new_request(user_id, user_data)
                 
-                await update.message.reply_text("""
+                    await update.message.reply_text("""
 📝 **Access Request Submitted!** 📝
 
 ✅ Your request has been sent to the admin for review.
@@ -1828,19 +1828,19 @@ Send Tunisia.xlsx with caption: "Tunisia"
 Please wait for admin approval. You will be notified once a decision is made.
 """)
             else:
-                await update.message.reply_text("❌ Error submitting request. Please try again later.")
-            return
+                    await update.message.reply_text("❌ Error submitting request. Please try again later.")
+                return
         
         # Check if user is approved for all other commands
         if not await self.is_user_approved(user_id):
-            await update.message.reply_text("""
+                await update.message.reply_text("""
 🔐 **Access Required**
 
 You need admin approval to use this bot.
 
 Please click "🔑 Request Access" to submit your request, or use /start to see the request menu.
 """)
-            return
+                return
         
         # Handle approved user commands
         if text == "📱 Get Number":
@@ -1856,13 +1856,13 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                 })()
                 await self.handle_change_number(update, context)
             else:
-                await update.message.reply_text("❌ No active number to change. Get a number first!")
+                    await update.message.reply_text("❌ No active number to change. Get a number first!")
         elif text == "📊 My Status":
             await self.show_user_status(update, context)
         elif text == "ℹ️ Help":
             await self.show_help(update, context)
         else:
-            await update.message.reply_text(
+                await update.message.reply_text(
                 "🤖 Please use the menu buttons below or type /start to begin."
             )
     
@@ -1878,7 +1878,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             
             if not self.is_admin(admin_id):
                 await query.edit_message_text("❌ You are not authorized to perform this action.")
-                return
+                    return
             
             if await self.approve_user(user_id_to_approve, admin_id):
                 await self.notify_user_approval_result(user_id_to_approve, True)
@@ -1886,7 +1886,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                 logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve}")
             else:
                 await query.edit_message_text("❌ Error approving user. Please try again.")
-            return
+                return
         
         elif query.data.startswith("reject_"):
             user_id_to_reject = int(query.data.split("_")[1])
@@ -1894,7 +1894,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             
             if not self.is_admin(admin_id):
                 await query.edit_message_text("❌ You are not authorized to perform this action.")
-                return
+                    return
             
             if await self.reject_user(user_id_to_reject, admin_id, "Request rejected by admin"):
                 await self.notify_user_approval_result(user_id_to_reject, False, "Request rejected by admin")
@@ -1902,13 +1902,13 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                 logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject}")
             else:
                 await query.edit_message_text("❌ Error rejecting user. Please try again.")
-            return
+                return
         
         # Check if user is approved for other callback actions
         user_id = query.from_user.id
         if not await self.is_user_approved(user_id):
             await query.edit_message_text("🔐 You need admin approval to use this bot. Please request access first.")
-            return
+                return
         
         # Handle approved user callback queries
         if query.data.startswith("country_"):
@@ -1917,11 +1917,11 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             await self.handle_change_number(update, context)
         elif query.data == "back_to_menu":
             # For callback queries, we need to edit the message instead
-            keyboard = [
+                keyboard = [
                 [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
                 [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
             ]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             
             welcome_message = f"""
 🤖 **Welcome to TaskTreasure OTP Bot** 🤖
@@ -2019,7 +2019,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             if not target_user:
                 logger.warning(f"❌ NO USER FOUND: No user waiting for OTP on number {number}")
                 logger.warning(f"❌ Available numbers: {[s.get('number') for s in self.user_sessions.values()]}")
-                return
+                    return
             
             # Log OTP in history for statistics
             await self.log_otp_received(target_user, number, target_country, service, otp_code, full_message)
