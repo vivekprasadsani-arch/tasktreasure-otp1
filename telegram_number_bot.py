@@ -335,7 +335,7 @@ Choose an action:"""
                 ]
                 reply_markup = InlineKeyboardMarkup(keyboard)
                 
-        await self.application.bot.send_message(
+                await self.application.bot.send_message(
                     chat_id=self.admin_user_id,
                     text=simple_message,
                     reply_markup=reply_markup
@@ -815,7 +815,7 @@ To use this bot, you need admin approval first.
         number = self.get_next_available_number(country, user_id)
         
         if not number:
-            await query.edit_message_text(
+        await query.edit_message_text(
                 f"❌ Sorry, no numbers available for {country} right now.\n\nTry another country or contact support."
             )
             return
@@ -884,7 +884,7 @@ To use this bot, you need admin approval first.
         new_number = self.get_next_available_number(country, user_id)
         
         if not new_number:
-            await query.edit_message_text(
+        await query.edit_message_text(
                 f"❌ Sorry, no more numbers available for {country}.\n\nAll numbers are currently in use.",
                 parse_mode='Markdown'
             )
@@ -1187,8 +1187,8 @@ From: TaskTreasure Support Team
             user_id_to_approve = int(context.args[0])
             admin_id = update.effective_user.id
             
-            if await self.approve_user(user_id_to_approve, admin_id):
-        await self.notify_user_approval_result(user_id_to_approve, True)
+        if await self.approve_user(user_id_to_approve, admin_id):
+            await self.notify_user_approval_result(user_id_to_approve, True)
                     await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
                 logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
             else:
@@ -1214,7 +1214,7 @@ From: TaskTreasure Support Team
             reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Request rejected by admin"
             admin_id = update.effective_user.id
             
-            if await self.reject_user(user_id_to_reject, admin_id, reason):
+        if await self.reject_user(user_id_to_reject, admin_id, reason):
         await self.notify_user_approval_result(user_id_to_reject, False, reason)
                     await update.message.reply_text(f"❌ User {user_id_to_reject} has been rejected.\nReason: {reason}")
                 logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject} via command")
@@ -1255,7 +1255,7 @@ From: TaskTreasure Support Team
                 # Notify user
                 try:
                     if self.application:
-                        await self.application.bot.send_message(
+                    await self.application.bot.send_message(
                             chat_id=user_id_to_remove,
                             text="""
 🚫 **Access Revoked** 🚫
@@ -1788,12 +1788,12 @@ Send Tunisia.xlsx with caption: "Tunisia"
         # Handle access request
         if text == "🔑 Request Access":
             # Check if user is already approved
-            if await self.is_user_approved(user_id):
+        if await self.is_user_approved(user_id):
         await update.message.reply_text("✅ You are already approved! Use /start to access the main menu.")
             return
             
             # Check cooldown
-            cooldown_end = await self.check_request_cooldown(user_id)
+        cooldown_end = await self.check_request_cooldown(user_id)
             if cooldown_end:
                 cooldown_remaining = cooldown_end - datetime.now()
                 hours = int(cooldown_remaining.total_seconds() // 3600)
@@ -1809,7 +1809,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
                 'last_name': user.last_name
             }
             
-            if await self.create_approval_request(user_id, user_data):
+        if await self.create_approval_request(user_id, user_data):
         await self.notify_admin_new_request(user_id, user_data)
                 
                     await update.message.reply_text("""
@@ -1844,7 +1844,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
         
         # Handle approved user commands
         if text == "📱 Get Number":
-            await self.show_countries(update, context)
+        await self.show_countries(update, context)
         elif text == "🔄 Change Number":
             if user_id in self.user_sessions:
                 country = self.user_sessions[user_id]['country']
@@ -1858,9 +1858,9 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             else:
         await update.message.reply_text("❌ No active number to change. Get a number first!")
         elif text == "📊 My Status":
-            await self.show_user_status(update, context)
+        await self.show_user_status(update, context)
         elif text == "ℹ️ Help":
-            await self.show_help(update, context)
+        await self.show_help(update, context)
         else:
         await update.message.reply_text(
                 "🤖 Please use the menu buttons below or type /start to begin."
@@ -1880,7 +1880,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
         await query.edit_message_text("❌ You are not authorized to perform this action.")
             return
             
-            if await self.approve_user(user_id_to_approve, admin_id):
+        if await self.approve_user(user_id_to_approve, admin_id):
         await self.notify_user_approval_result(user_id_to_approve, True)
         await query.edit_message_text(f"✅ User {user_id_to_approve} has been **APPROVED** successfully!")
                 logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve}")
@@ -1896,7 +1896,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
         await query.edit_message_text("❌ You are not authorized to perform this action.")
             return
             
-            if await self.reject_user(user_id_to_reject, admin_id, "Request rejected by admin"):
+        if await self.reject_user(user_id_to_reject, admin_id, "Request rejected by admin"):
         await self.notify_user_approval_result(user_id_to_reject, False, "Request rejected by admin")
         await query.edit_message_text(f"❌ User {user_id_to_reject} has been **REJECTED**.")
                 logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject}")
@@ -1907,14 +1907,14 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
         # Check if user is approved for other callback actions
         user_id = query.from_user.id
         if not await self.is_user_approved(user_id):
-            await query.edit_message_text("🔐 You need admin approval to use this bot. Please request access first.")
+        await query.edit_message_text("🔐 You need admin approval to use this bot. Please request access first.")
             return
         
         # Handle approved user callback queries
         if query.data.startswith("country_"):
-            await self.handle_country_selection(update, context)
+        await self.handle_country_selection(update, context)
         elif query.data.startswith("change_"):
-            await self.handle_change_number(update, context)
+        await self.handle_change_number(update, context)
         elif query.data == "back_to_menu":
             # For callback queries, we need to edit the message instead
                 keyboard = [
@@ -1938,7 +1938,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
 **Choose an option from the menu below:**
 """
             
-            await query.edit_message_text(
+        await query.edit_message_text(
                 welcome_message
             )
     
@@ -1966,7 +1966,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
         """Send message to Telegram channel"""
         try:
             if hasattr(self, 'application') and self.application:
-        await self.application.bot.send_message(
+            await self.application.bot.send_message(
                     chat_id=self.channel_id,
                     text=message,
                     parse_mode='Markdown'
@@ -2022,7 +2022,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             return
             
             # Log OTP in history for statistics
-            await self.log_otp_received(target_user, number, target_country, service, otp_code, full_message)
+        await self.log_otp_received(target_user, number, target_country, service, otp_code, full_message)
             
             # Send notification to user
             app = Application.builder().token(self.bot_token).build()
