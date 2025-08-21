@@ -208,10 +208,10 @@ class TelegramNumberBot:
         """Check if user is approved to use the bot"""
         try:
             if self.is_admin(user_id):
-                 return True
+                return True
             
             if not self.supabase:
-                              return False
+                return False
             
             result = self.supabase.table('approved_users').select('*').eq('user_id', user_id).eq('is_active', True).execute()
             return len(result.data) > 0
@@ -223,13 +223,13 @@ class TelegramNumberBot:
         """Check if user is in cooldown period, returns cooldown end time if in cooldown"""
         try:
             if not self.supabase:
-                 return None
+                return None
             
             result = self.supabase.table('user_approval_requests').select('next_request_allowed_at').eq('user_id', user_id).execute()
             if result.data:
                 cooldown_end = datetime.fromisoformat(result.data[0]['next_request_allowed_at'].replace('Z', '+00:00'))
                 if cooldown_end > datetime.now():
-                     return cooldown_end
+                    return cooldown_end
             return None
         except Exception as e:
             logger.error(f"❌ Error checking request cooldown: {e}")
@@ -239,7 +239,7 @@ class TelegramNumberBot:
         """Create a new approval request"""
         try:
             if not self.supabase:
-                 return False
+                return False
             
             # Set next allowed request time (3 hours from now)
             next_allowed = datetime.now() + timedelta(hours=3)
@@ -279,7 +279,7 @@ class TelegramNumberBot:
             # Escape HTML special characters
             def escape_html(text):
                 if not text:
-                     return "N/A"
+                    return "N/A"
             return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             
             first_name = escape_html(user_data.get('first_name', 'N/A'))
@@ -349,12 +349,12 @@ Choose an action:"""
         """Approve user access"""
         try:
             if not self.supabase:
-                 return False
+                return False
             
             # Get user request data
             request_result = self.supabase.table('user_approval_requests').select('*').eq('user_id', user_id).execute()
             if not request_result.data:
-                 return False
+                return False
             
             request_data = request_result.data[0]
             
@@ -385,7 +385,7 @@ Choose an action:"""
         """Reject user access"""
         try:
             if not self.supabase:
-                 return False
+                return False
             
             # Update request status
             self.supabase.table('user_approval_requests').update({
@@ -422,11 +422,11 @@ You can now use the bot to get phone numbers and receive OTP codes.
 <b>Choose an option from the menu below:</b>
 """
                 # Create main menu keyboard
-                    keyboard = [
+                keyboard = [
                     [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
                     [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
                 ]
-                    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             else:
                 reason_escaped = reason.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') if reason else 'No specific reason provided'
                 message = f"""
@@ -508,7 +508,7 @@ If you believe this is a mistake, please contact the administrator.
                 
                 if stats_result.data:
                     stats = stats_result.data[0]
-                return {
+                    return {
                         'total_otps': stats.get('total_otps', 0),
                         'unique_services': stats.get('unique_services', 0),
                         'unique_countries': stats.get('unique_countries', 0),
@@ -517,7 +517,7 @@ If you believe this is a mistake, please contact the administrator.
                         'recent_otps': recent_result.data
                     }
                 else:
-                return {
+                    return {
                         'total_otps': 0,
                         'unique_services': 0,
                         'unique_countries': 0,
@@ -572,7 +572,7 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is in 3-day cooldown period"""
         try:
             if not self.supabase:
-                 return False
+                return False
                 
             result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
             
@@ -586,7 +586,7 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is currently assigned to another user"""
         try:
             if not self.supabase:
-                 return False
+                return False
                 
             result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
             
@@ -600,15 +600,15 @@ If you believe this is a mistake, please contact the administrator.
         """Assign number to user with concurrent protection"""
         try:
             if not self.supabase:
-                 return False
+                return False
             
             # Double-check availability with database lock
             if self.is_number_currently_assigned(number):
-                 return False
+                return False
             
             # Check cooldown
             if self.is_number_in_cooldown(number):
-                 return False
+                return False
             
             # Deactivate any existing assignments for this user
             self.supabase.table('number_assignments').update({'is_active': False}).eq('user_id', user_id).eq('is_active', True).execute()
@@ -627,10 +627,10 @@ If you believe this is a mistake, please contact the administrator.
             
             if result.data:
                 logger.info(f"✅ Number {number} assigned to user {user_id}")
-            return True
+                return True
             else:
                 logger.error(f"❌ Failed to assign number {number} to user {user_id}")
-            return False
+                return False
                 
         except Exception as e:
             logger.error(f"❌ Error assigning number: {e}")
@@ -641,7 +641,7 @@ If you believe this is a mistake, please contact the administrator.
         try:
             numbers = self.get_country_numbers(country)
             if not numbers:
-                 return None
+                return None
             
             # Shuffle numbers to distribute load and avoid conflicts
             import random
@@ -1425,11 +1425,11 @@ If you believe this is a mistake, please contact the administrator.
                     break
             
             if not column_found:
-                              return False, f"Excel file must have a column with phone numbers (e.g., 'number', 'phone', or 'mobile')", 0
+                return False, f"Excel file must have a column with phone numbers (e.g., 'number', 'phone', or 'mobile')", 0
             
             # Check if file has data
             if len(df) == 0:
-     return False, "Excel file is empty", 0
+                return False, "Excel file is empty", 0
             
             # Validate phone numbers format
             valid_numbers = 0
@@ -1442,11 +1442,11 @@ If you believe this is a mistake, please contact the administrator.
                         valid_numbers += 1
             
             if valid_numbers == 0:
-                              return False, "No valid phone numbers found in the file", 0
+                return False, "No valid phone numbers found in the file", 0
             
             success_rate = (valid_numbers / len(df)) * 100
             if success_rate < 50:
-                 return False, f"Too many invalid numbers. Only {success_rate:.1f}% are valid (minimum 50% required)", valid_numbers
+                return False, f"Too many invalid numbers. Only {success_rate:.1f}% are valid (minimum 50% required)", valid_numbers
             
             return True, f"File validated successfully. Found {valid_numbers} valid numbers out of {len(df)} total.", valid_numbers
             
