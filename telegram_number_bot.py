@@ -113,15 +113,25 @@ class TelegramNumberBot:
             logger.error(f"❌ Error initializing number states: {e}")
     
     def load_admin_settings(self):
-        """Load admin settings from database"""
+        """Load admin settings from environment variable or database"""
         try:
+            # First try to load from environment variable (for Render deployment)
+            admin_user_env = os.getenv('ADMIN_USER_ID')
+            if admin_user_env:
+                self.admin_user_id = int(admin_user_env)
+                logger.info(f"✅ Admin user loaded from environment: {self.admin_user_id}")
+                return
+            
+            # Fallback to database
             if self.supabase:
                 result = self.supabase.table('admin_settings').select('setting_value').eq('setting_key', 'admin_user_id').execute()
                 if result.data:
                     self.admin_user_id = int(result.data[0]['setting_value'])
-                    logger.info(f"✅ Admin user loaded: {self.admin_user_id}")
+                    logger.info(f"✅ Admin user loaded from database: {self.admin_user_id}")
                 else:
-                    logger.warning("⚠️ No admin user configured")
+                    logger.warning("⚠️ No admin user configured in database")
+            else:
+                logger.warning("⚠️ No admin user configured - neither environment nor database")
         except Exception as e:
             logger.error(f"❌ Error loading admin settings: {e}")
     
@@ -254,7 +264,16 @@ class TelegramNumberBot:
     async def notify_admin_new_request(self, user_id: int, user_data: dict):
         """Notify admin about new user request"""
         try:
-            if not self.admin_user_id or not self.application:
+            logger.info(f"🔔 Attempting to notify admin about user {user_id} request")
+            logger.info(f"🔧 Admin user ID: {self.admin_user_id}")
+            logger.info(f"🔧 Application available: {self.application is not None}")
+            
+            if not self.admin_user_id:
+                logger.error("❌ Admin user ID not set - cannot send notification")
+                return
+                
+            if not self.application:
+                logger.error("❌ Bot application not available - cannot send notification")
                 return
             
             user_info = f"👤 **New User Request**\n\n"
@@ -283,9 +302,10 @@ class TelegramNumberBot:
                 reply_markup=reply_markup,
                 parse_mode='Markdown'
             )
-            logger.info(f"📧 Notified admin about user {user_id} request")
+            logger.info(f"✅ Successfully notified admin {self.admin_user_id} about user {user_id} request")
         except Exception as e:
             logger.error(f"❌ Error notifying admin: {e}")
+            logger.error(f"❌ Admin ID: {self.admin_user_id}, App available: {self.application is not None}")
     
     async def approve_user(self, user_id: int, admin_id: int):
         """Approve user access"""
@@ -1303,6 +1323,50 @@ If you believe this is a mistake, please contact the administrator.
             await update.message.reply_text(f"❌ Error: {e}")
             logger.error(f"Admin list users error: {e}")
     
+    async def admin_debug_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to show debug information"""
+        if not self.is_admin(update.effective_user.id):
+            await update.message.reply_text("❌ You are not authorized to use this command.")
+            return
+        
+        try:
+            # Check system status
+            debug_info = f"""
+🔧 **System Debug Information**
+
+**🔑 Admin Configuration:**
+• Admin User ID: `{self.admin_user_id}`
+• Environment Variable: `{os.getenv('ADMIN_USER_ID', 'Not Set')}`
+• Your User ID: `{update.effective_user.id}`
+• Admin Status: {'✅ Verified' if self.is_admin(update.effective_user.id) else '❌ Not Admin'}
+
+**🤖 Bot Application:**
+• Application Available: {'✅ Yes' if self.application else '❌ No'}
+• Bot Instance: {'✅ Available' if hasattr(self, 'application') and self.application else '❌ Not Available'}
+
+**💾 Database Connection:**
+• Supabase Connected: {'✅ Yes' if self.supabase else '❌ No'}
+• Database URL: `{self.supabase_url[:30]}...`
+
+**🌍 Countries:**
+• Available Countries: {len(self.available_countries)}
+• Countries: {', '.join(self.available_countries[:5])}{'...' if len(self.available_countries) > 5 else ''}
+
+**👥 User Sessions:**
+• Active Sessions: {len(self.user_sessions)}
+
+**📊 System Status:**
+• Bot Running: ✅ Yes
+• Notification System: {'✅ Ready' if self.admin_user_id and self.application else '❌ Not Ready'}
+"""
+            
+            await update.message.reply_text(debug_info, parse_mode='Markdown')
+            logger.info(f"🔧 Admin {update.effective_user.id} requested debug info")
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error: {e}")
+            logger.error(f"Admin debug error: {e}")
+    
     def validate_excel_file(self, file_path: str, country_name: str) -> tuple[bool, str, int]:
         """Validate uploaded Excel file format and content"""
         try:
@@ -1972,6 +2036,9 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             app.add_handler(CommandHandler("delete_country", self.admin_delete_country))
             app.add_handler(CommandHandler("reload_countries", self.admin_reload_countries))
             
+            # Add debug command
+            app.add_handler(CommandHandler("debug", self.admin_debug_info))
+            
             # Add document handler for file uploads
             app.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
             
@@ -1988,6 +2055,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             logger.info("✅ Telegram Number Bot is running with admin approval system!")
             logger.info("📋 User Admin Commands: /approve /reject /remove /requests /users")
             logger.info("🌍 Country Admin Commands: /upload /countries /delete_country /reload_countries")
+            logger.info("🔧 Debug Command: /debug - Show system status and configuration")
             
             # Keep running
             while True:
