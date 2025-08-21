@@ -276,16 +276,26 @@ class TelegramNumberBot:
                 logger.error("❌ Bot application not available - cannot send notification")
                 return
             
-            user_info = f"👤 **New User Request**\n\n"
-            user_info += f"🆔 **User ID:** `{user_id}`\n"
-            user_info += f"👤 **Name:** {user_data.get('first_name', 'N/A')}"
-            if user_data.get('last_name'):
-                user_info += f" {user_data.get('last_name')}"
+            # Escape HTML special characters
+            def escape_html(text):
+                if not text:
+                    return "N/A"
+                return str(text).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            first_name = escape_html(user_data.get('first_name', 'N/A'))
+            last_name = escape_html(user_data.get('last_name', ''))
+            username = escape_html(user_data.get('username', ''))
+            
+            user_info = f"👤 <b>New User Request</b>\n\n"
+            user_info += f"🆔 <b>User ID:</b> <code>{user_id}</code>\n"
+            user_info += f"👤 <b>Name:</b> {first_name}"
+            if last_name:
+                user_info += f" {last_name}"
             user_info += "\n"
-            if user_data.get('username'):
-                user_info += f"🔤 **Username:** @{user_data.get('username')}\n"
-            user_info += f"⏰ **Requested:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            user_info += "**Choose an action:**"
+            if username:
+                user_info += f"🔤 <b>Username:</b> @{username}\n"
+            user_info += f"⏰ <b>Requested:</b> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+            user_info += "<b>Choose an action:</b>"
             
             # Create inline keyboard for admin actions
             keyboard = [
@@ -300,12 +310,40 @@ class TelegramNumberBot:
                 chat_id=self.admin_user_id,
                 text=user_info,
                 reply_markup=reply_markup,
-                parse_mode='Markdown'
+                parse_mode='HTML'
             )
             logger.info(f"✅ Successfully notified admin {self.admin_user_id} about user {user_id} request")
         except Exception as e:
-            logger.error(f"❌ Error notifying admin: {e}")
-            logger.error(f"❌ Admin ID: {self.admin_user_id}, App available: {self.application is not None}")
+            logger.error(f"❌ Error notifying admin with HTML: {e}")
+            
+            # Fallback: try without formatting
+            try:
+                simple_message = f"""👤 New User Request
+
+🆔 User ID: {user_id}
+👤 Name: {user_data.get('first_name', 'N/A')} {user_data.get('last_name', '')}
+🔤 Username: @{user_data.get('username', 'N/A')}
+⏰ Requested: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Choose an action:"""
+                
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
+                        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                
+                await self.application.bot.send_message(
+                    chat_id=self.admin_user_id,
+                    text=simple_message,
+                    reply_markup=reply_markup
+                )
+                logger.info(f"✅ Fallback notification sent to admin {self.admin_user_id}")
+            except Exception as fallback_error:
+                logger.error(f"❌ Fallback notification also failed: {fallback_error}")
+                logger.error(f"❌ Admin ID: {self.admin_user_id}, App available: {self.application is not None}")
     
     async def approve_user(self, user_id: int, admin_id: int):
         """Approve user access"""
@@ -370,18 +408,18 @@ class TelegramNumberBot:
             
             if approved:
                 message = """
-🎉 **Congratulations!** 🎉
+🎉 <b>Congratulations!</b> 🎉
 
-✅ Your request has been **APPROVED** by admin!
+✅ Your request has been <b>APPROVED</b> by admin!
 
 You can now use the bot to get phone numbers and receive OTP codes.
 
-**Available Commands:**
+<b>Available Commands:</b>
 📱 Get Number - Choose country and get a phone number
 🔄 Change Number - Get a different number  
 📊 My Status - Check your current number status
 
-**Choose an option from the menu below:**
+<b>Choose an option from the menu below:</b>
 """
                 # Create main menu keyboard
                 keyboard = [
@@ -390,14 +428,15 @@ You can now use the bot to get phone numbers and receive OTP codes.
                 ]
                 reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             else:
+                reason_escaped = reason.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') if reason else 'No specific reason provided'
                 message = f"""
-😔 **Request Rejected** 😔
+😔 <b>Request Rejected</b> 😔
 
-❌ Your access request has been **REJECTED** by admin.
+❌ Your access request has been <b>REJECTED</b> by admin.
 
-**Reason:** {reason or 'No specific reason provided'}
+<b>Reason:</b> {reason_escaped}
 
-⏰ You can submit a new request after **3 hours** from your last request.
+⏰ You can submit a new request after <b>3 hours</b> from your last request.
 
 If you believe this is a mistake, please contact the administrator.
 """
@@ -406,7 +445,8 @@ If you believe this is a mistake, please contact the administrator.
             await self.application.bot.send_message(
                 chat_id=user_id,
                 text=message,
-                reply_markup=reply_markup
+                reply_markup=reply_markup,
+                parse_mode='HTML'
             )
             logger.info(f"📧 Notified user {user_id} about {'approval' if approved else 'rejection'}")
         except Exception as e:
@@ -648,13 +688,13 @@ If you believe this is a mistake, please contact the administrator.
         # Check if user is approved
         if await self.is_user_approved(user_id):
             # User is approved, show main menu
-            keyboard = [
-                [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
-                [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
-            ]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
-            
-            welcome_message = f"""
+        keyboard = [
+            [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
+            [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
+        ]
+        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        
+        welcome_message = f"""
 🤖 **Welcome to TaskTreasure OTP Bot** 🤖
 
 Hi {user_name}! 👋
@@ -670,9 +710,9 @@ Hi {user_name}! 👋
 
 **Choose an option from the menu below:**
 """
-            
-            await update.message.reply_text(
-                welcome_message,
+        
+        await update.message.reply_text(
+            welcome_message,
                 reply_markup=reply_markup
             )
             return
