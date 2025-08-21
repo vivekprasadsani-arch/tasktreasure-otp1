@@ -26,16 +26,28 @@ logger = logging.getLogger(__name__)
 
 class TelegramNumberBot:
     def __init__(self):
+        # Load environment variables
         self.bot_token = os.getenv('BOT_TOKEN')
         if not self.bot_token:
             logger.error("❌ BOT_TOKEN environment variable not set!")
             raise ValueError("BOT_TOKEN environment variable is required")
+        
         self.channel_id = "-1002724043027"
         
-        # Supabase configuration
-        self.supabase_url = "https://wddcrtrgirhcemmobgcc.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI"
+        # Supabase configuration from environment variables
+        self.supabase_url = os.getenv('SUPABASE_URL', "https://wddcrtrgirhcemmobgcc.supabase.co")
+        self.supabase_key = os.getenv('SUPABASE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI")
         self.supabase: Client = None
+        
+        # Admin User ID from environment (with fallback)
+        self.admin_user_id_env = os.getenv('ADMIN_USER_ID')
+        
+        # Debug logging for environment variables
+        logger.info(f"🔧 Environment Variables:")
+        logger.info(f"   BOT_TOKEN: {'✅ Set' if self.bot_token else '❌ Missing'}")
+        logger.info(f"   SUPABASE_URL: {'✅ Set' if self.supabase_url else '❌ Missing'}")
+        logger.info(f"   SUPABASE_KEY: {'✅ Set' if self.supabase_key else '❌ Missing'}")
+        logger.info(f"   ADMIN_USER_ID: {'✅ Set' if self.admin_user_id_env else '❌ Missing'}")
         
         # Countries directory
         self.countries_dir = "Countries"
@@ -107,17 +119,76 @@ class TelegramNumberBot:
             logger.error(f"❌ Error initializing number states: {e}")
     
     def load_admin_settings(self):
-        """Load admin settings from database"""
+        """Load admin settings from environment or database"""
         try:
+            # First try to load from environment variable
+            if self.admin_user_id_env:
+                try:
+                    self.admin_user_id = int(self.admin_user_id_env)
+                    logger.info(f"✅ Admin user loaded from ENV: {self.admin_user_id}")
+                    
+                    # Also update database with env value if possible
+                    if self.supabase:
+                        try:
+                            self.supabase.table('admin_settings').upsert({
+                                'setting_key': 'admin_user_id',
+                                'setting_value': str(self.admin_user_id)
+                            }, on_conflict='setting_key').execute()
+                            logger.info("✅ Database updated with env admin ID")
+                        except Exception as db_error:
+                            logger.warning(f"⚠️ Could not update database: {db_error}")
+                    return
+                except ValueError:
+                    logger.error(f"❌ Invalid ADMIN_USER_ID in environment: {self.admin_user_id_env}")
+            
+            # Fallback to database if env not available
             if self.supabase:
                 result = self.supabase.table('admin_settings').select('setting_value').eq('setting_key', 'admin_user_id').execute()
                 if result.data:
                     self.admin_user_id = int(result.data[0]['setting_value'])
-                    logger.info(f"✅ Admin user loaded: {self.admin_user_id}")
+                    logger.info(f"✅ Admin user loaded from DB: {self.admin_user_id}")
                 else:
-                    logger.warning("⚠️ No admin user configured")
+                    logger.warning("⚠️ No admin user configured in database")
+                    # Try to set default admin if not exists
+                    try:
+                        default_admin = "7325836764"  # Default admin ID
+                        self.supabase.table('admin_settings').insert({
+                            'setting_key': 'admin_user_id',
+                            'setting_value': default_admin
+                        }).execute()
+                        self.admin_user_id = int(default_admin)
+                        logger.info(f"✅ Default admin configured: {self.admin_user_id}")
+                    except Exception as insert_error:
+                        logger.error(f"❌ Failed to set default admin: {insert_error}")
         except Exception as e:
             logger.error(f"❌ Error loading admin settings: {e}")
+    
+    async def test_admin_notification(self, test_message: str = "Test notification from TaskTreasure OTP Bot") -> bool:
+        """Test admin notification system"""
+        try:
+            if not self.admin_user_id:
+                logger.error("❌ Cannot test - Admin User ID not configured")
+                return False
+                
+            if not self.bot_token:
+                logger.error("❌ Cannot test - Bot Token not configured")
+                return False
+                
+            import telegram
+            bot = telegram.Bot(token=self.bot_token)
+            
+            await bot.send_message(
+                chat_id=self.admin_user_id,
+                text=f"🧪 **System Test**\n\n{test_message}\n\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                parse_mode='Markdown'
+            )
+            
+            logger.info(f"✅ Admin notification test successful")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Admin notification test failed: {e}")
+            return False
     
     def format_phone_number(self, number: str, country: str = "") -> str:
         """Format phone number for display with proper spacing and country code"""
@@ -667,7 +738,8 @@ class TelegramNumberBot:
                 # Notify admin
                 if self.admin_user_id:
                     try:
-                        app = Application.builder().token(self.bot_token).build()
+                        import telegram
+                        bot = telegram.Bot(token=self.bot_token)
                         
                         admin_message = f"🔔 **New Access Request**\n\n"
                         admin_message += f"👤 **User:** {user_name}\n"
@@ -679,7 +751,11 @@ class TelegramNumberBot:
                         admin_message += f"`/approve {user_id}` - Approve user\n"
                         admin_message += f"`/reject {user_id}` - Reject user"
                         
-                        await app.bot.send_message(
+                        # Debug logging
+                        logger.info(f"🔍 DEBUG: Admin User ID = {self.admin_user_id}")
+                        logger.info(f"🔍 DEBUG: Bot Token = {self.bot_token[:10]}...{self.bot_token[-10:]}")
+                        
+                        await bot.send_message(
                             chat_id=self.admin_user_id,
                             text=admin_message,
                             parse_mode='Markdown'
@@ -689,6 +765,20 @@ class TelegramNumberBot:
                         
                     except Exception as e:
                         logger.error(f"❌ Failed to notify admin: {e}")
+                        logger.error(f"❌ Admin ID: {self.admin_user_id}, Bot Token exists: {bool(self.bot_token)}")
+                        
+                        # Try without markdown parsing as fallback
+                        try:
+                            simple_message = f"New Access Request from {user_name} (ID: {user_id})\n\nApprove: /approve {user_id}\nReject: /reject {user_id}"
+                            await bot.send_message(
+                                chat_id=self.admin_user_id,
+                                text=simple_message
+                            )
+                            logger.info(f"📢 Admin notified with simple message (fallback)")
+                        except Exception as fallback_error:
+                            logger.error(f"❌ Fallback notification also failed: {fallback_error}")
+                else:
+                    logger.error(f"❌ Admin User ID not configured: {self.admin_user_id}")
                 
                 await update.message.reply_text(
                     "📝 **Access Request Submitted**\n\n"
@@ -1125,22 +1215,23 @@ From: TaskTreasure Support Team
             success = await self.approve_user_request(user_request['id'], user_id, notes)
             
             if success:
-                # Notify the user
-                try:
-                    app = Application.builder().token(self.bot_token).build()
-                    
-                    user_message = "✅ **Access Approved!**\n\n"
-                    user_message += "Your request to use TaskTreasure OTP Bot has been approved by the admin.\n\n"
-                    user_message += "You can now use all bot features. Send /start to begin!"
-                    
-                    if notes:
-                        user_message += f"\n\n**Admin Notes:** {notes}"
-                    
-                    await app.bot.send_message(
-                        chat_id=target_user_id,
-                        text=user_message,
-                        parse_mode='Markdown'
-                    )
+                                        # Notify the user
+                        try:
+                            import telegram
+                            bot = telegram.Bot(token=self.bot_token)
+                            
+                            user_message = "✅ **Access Approved!**\n\n"
+                            user_message += "Your request to use TaskTreasure OTP Bot has been approved by the admin.\n\n"
+                            user_message += "You can now use all bot features. Send /start to begin!"
+                            
+                            if notes:
+                                user_message += f"\n\n**Admin Notes:** {notes}"
+                            
+                            await bot.send_message(
+                                chat_id=target_user_id,
+                                text=user_message,
+                                parse_mode='Markdown'
+                            )
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to notify approved user: {e}")
@@ -1200,22 +1291,23 @@ From: TaskTreasure Support Team
             success = await self.reject_user_request(user_request['id'], user_id, reason)
             
             if success:
-                # Notify the user
-                try:
-                    app = Application.builder().token(self.bot_token).build()
-                    
-                    user_message = "❌ **Access Request Rejected**\n\n"
-                    user_message += "Your request to use TaskTreasure OTP Bot has been rejected by the admin.\n\n"
-                    user_message += "You can request access again after the 3-hour cooldown period."
-                    
-                    if reason:
-                        user_message += f"\n\n**Reason:** {reason}"
-                    
-                    await app.bot.send_message(
-                        chat_id=target_user_id,
-                        text=user_message,
-                        parse_mode='Markdown'
-                    )
+                                        # Notify the user
+                        try:
+                            import telegram
+                            bot = telegram.Bot(token=self.bot_token)
+                            
+                            user_message = "❌ **Access Request Rejected**\n\n"
+                            user_message += "Your request to use TaskTreasure OTP Bot has been rejected by the admin.\n\n"
+                            user_message += "You can request access again after the 3-hour cooldown period."
+                            
+                            if reason:
+                                user_message += f"\n\n**Reason:** {reason}"
+                            
+                            await bot.send_message(
+                                chat_id=target_user_id,
+                                text=user_message,
+                                parse_mode='Markdown'
+                            )
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to notify rejected user: {e}")
@@ -1361,6 +1453,40 @@ From: TaskTreasure Support Team
             
         except Exception as e:
             await update.message.reply_text(f"❌ Error getting pending requests: {e}")
+    
+    async def admin_test_notification(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to test notification system"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ You don't have permission to use this command.")
+            return
+        
+        try:
+            test_message = " ".join(context.args) if context.args else "Test notification"
+            
+            await update.message.reply_text("🧪 **Testing Admin Notification System...**")
+            
+            # Test the notification
+            success = await self.test_admin_notification(test_message)
+            
+            if success:
+                await update.message.reply_text(
+                    "✅ **Notification Test Successful!**\n\n"
+                    "Admin notification system is working correctly."
+                )
+            else:
+                await update.message.reply_text(
+                    "❌ **Notification Test Failed!**\n\n"
+                    "Please check:"
+                    "\n- Admin User ID configuration"
+                    "\n- Bot Token validity"
+                    "\n- Database connection"
+                    "\n\nCheck logs for more details."
+                )
+                
+        except Exception as e:
+            await update.message.reply_text(f"❌ Test failed with error: {e}")
     
     async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to show bot statistics"""
@@ -1631,6 +1757,7 @@ From: TaskTreasure Support Team
             app.add_handler(CommandHandler("adduser", self.admin_add_user))
             app.add_handler(CommandHandler("removeuser", self.admin_remove_user))
             app.add_handler(CommandHandler("pending", self.admin_pending))
+            app.add_handler(CommandHandler("testnotify", self.admin_test_notification))
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
             app.add_handler(CallbackQueryHandler(self.handle_callback_query))
             

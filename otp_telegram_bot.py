@@ -61,10 +61,16 @@ class OTPTelegramBot:
         # Initialize Telegram bot
         self.bot = telegram.Bot(token=self.bot_token)
         
-        # Supabase configuration
-        self.supabase_url = "https://wddcrtrgirhcemmobgcc.supabase.co"
-        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI"
+        # Supabase configuration from environment variables
+        self.supabase_url = os.getenv('SUPABASE_URL', "https://wddcrtrgirhcemmobgcc.supabase.co")
+        self.supabase_key = os.getenv('SUPABASE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI")
         self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
+        
+        # Debug logging for environment variables
+        logger.info(f"🔧 OTP Bot Environment:")
+        logger.info(f"   BOT_TOKEN: {'✅ Set' if self.bot_token else '❌ Missing'}")
+        logger.info(f"   SUPABASE_URL: {'✅ Set' if os.getenv('SUPABASE_URL') else '⚠️ Using default'}")
+        logger.info(f"   SUPABASE_KEY: {'✅ Set' if os.getenv('SUPABASE_KEY') else '⚠️ Using default'}")
         
         # Playwright browser and page
         self.playwright = None
@@ -83,6 +89,7 @@ class OTPTelegramBot:
             try:
                 self.number_bot = TelegramNumberBot()
                 logger.info("✅ Number bot initialized for user notifications")
+                logger.info(f"👥 Number bot admin ID: {getattr(self.number_bot, 'admin_user_id', 'Not set')}")
             except Exception as e:
                 logger.warning(f"⚠️ Could not initialize number bot: {e}")
         
