@@ -150,14 +150,14 @@ class TelegramNumberBot:
             # Format with spaces for readability
             if len(clean_number) > 10:
                 # International format: +XX XXX XXX XXXX
-        return
+                return
             else:
                 # Shorter numbers: +XX XXXX XXXX
-        return
+                return
                 
         except Exception as e:
             logger.warning(f"⚠️ Number formatting error: {e}")
-        return
+            return
     
     def get_copy_friendly_number(self, number: str) -> str:
         """Get clean number for copy-paste without spaces"""
@@ -170,11 +170,11 @@ class TelegramNumberBot:
                 if len(clean_number) > 7:
                     clean_number = '+' + clean_number
             
-        return
+                return
                 
         except Exception as e:
             logger.warning(f"⚠️ Copy-friendly format error: {e}")
-        return
+            return
     
     def load_user_sessions_from_db(self):
         """Load active user sessions from database on bot restart"""
@@ -183,7 +183,7 @@ class TelegramNumberBot:
                 result = self.supabase.table('user_sessions').select('*').eq('waiting_for_otp', True).execute()
                 for session in result.data:
                     user_id = session['user_id']
-                    self.user_sessions[user_id] = {
+        self.user_sessions[user_id] = {
                         'country': session['country'],
                         'number': session['number'],
                         'assigned_at': session['assigned_at'],
@@ -194,7 +194,7 @@ class TelegramNumberBot:
                     country = session['country']
                     number = session['number']
                     if country in self.assigned_numbers:
-                        self.assigned_numbers[country].add(number)
+        self.assigned_numbers[country].add(number)
                 
                 logger.info(f"✅ Restored {len(result.data)} user sessions from database")
         except Exception as e:
@@ -202,44 +202,44 @@ class TelegramNumberBot:
     
     def is_admin(self, user_id: int) -> bool:
         """Check if user is admin"""
-        return self.admin_user_id and user_id == self.admin_user_id
+            return self.admin_user_id and user_id == self.admin_user_id
     
     async def is_user_approved(self, user_id: int) -> bool:
         """Check if user is approved to use the bot"""
         try:
             if self.is_admin(user_id):
-                return
+        return
             
             if not self.supabase:
-                return
+            return
             
             result = self.supabase.table('approved_users').select('*').eq('user_id', user_id).eq('is_active', True).execute()
-        return
+                return
         except Exception as e:
             logger.error(f"❌ Error checking user approval: {e}")
-        return
+            return
     
     async def check_request_cooldown(self, user_id: int) -> Optional[datetime]:
         """Check if user is in cooldown period, returns cooldown end time if in cooldown"""
         try:
             if not self.supabase:
-                return
+        return
             
             result = self.supabase.table('user_approval_requests').select('next_request_allowed_at').eq('user_id', user_id).execute()
             if result.data:
                 cooldown_end = datetime.fromisoformat(result.data[0]['next_request_allowed_at'].replace('Z', '+00:00'))
             if cooldown_end > datetime.now():
                 return
-        return
+                return
         except Exception as e:
             logger.error(f"❌ Error checking request cooldown: {e}")
-        return
+                return
     
     async def create_approval_request(self, user_id: int, user_data: dict):
         """Create a new approval request"""
         try:
             if not self.supabase:
-                return
+        return
             
             # Set next allowed request time (3 hours from now)
             next_allowed = datetime.now() + timedelta(hours=3)
@@ -259,7 +259,7 @@ class TelegramNumberBot:
         return
         except Exception as e:
             logger.error(f"❌ Error creating approval request: {e}")
-        return
+            return
     
     async def notify_admin_new_request(self, user_id: int, user_data: dict):
         """Notify admin about new user request"""
@@ -270,17 +270,17 @@ class TelegramNumberBot:
             
             if not self.admin_user_id:
                 logger.error("❌ Admin user ID not set - cannot send notification")
-        return
+                return
                 
             if not self.application:
                 logger.error("❌ Bot application not available - cannot send notification")
-        return
+                return
             
             # Escape HTML special characters
             def escape_html(text):
-        if not text:
-        return
-        return
+                if not text:
+                return
+                return
             
             first_name = escape_html(user_data.get('first_name', 'N/A'))
             last_name = escape_html(user_data.get('last_name', ''))
@@ -349,7 +349,7 @@ Choose an action:"""
         """Approve user access"""
         try:
             if not self.supabase:
-                return
+        return
             
             # Get user request data
             request_result = self.supabase.table('user_approval_requests').select('*').eq('user_id', user_id).execute()
@@ -379,13 +379,13 @@ Choose an action:"""
         return
         except Exception as e:
             logger.error(f"❌ Error approving user: {e}")
-        return
+            return
     
     async def reject_user(self, user_id: int, admin_id: int, reason: str = "Request rejected"):
         """Reject user access"""
         try:
             if not self.supabase:
-                return
+        return
             
             # Update request status
         self.supabase.table('user_approval_requests').update({
@@ -398,13 +398,13 @@ Choose an action:"""
         return
         except Exception as e:
             logger.error(f"❌ Error rejecting user: {e}")
-        return
+            return
     
     async def notify_user_approval_result(self, user_id: int, approved: bool, reason: str = None):
         """Notify user about approval/rejection result"""
         try:
             if not self.application:
-                return
+        return
             
             if approved:
                 message = """
@@ -456,7 +456,7 @@ If you believe this is a mistake, please contact the administrator.
         """Add number to 3-day cooldown after receiving OTP"""
         try:
             if not self.supabase:
-                return
+        return
             
             # Remove any existing cooldown for this number
             self.supabase.table('otp_cooldown').delete().eq('number', number).execute()
@@ -527,7 +527,7 @@ If you believe this is a mistake, please contact the administrator.
                     }
         except Exception as e:
             logger.error(f"❌ Error getting OTP stats: {e}")
-        return
+            return
     
     async def get_all_users(self) -> list:
         """Get all users who have used the bot"""
@@ -535,10 +535,10 @@ If you believe this is a mistake, please contact the administrator.
             if self.supabase:
                 result = self.supabase.table('user_sessions').select('user_id').execute()
         return
-        return
+            return
         except Exception as e:
             logger.error(f"❌ Error getting all users: {e}")
-        return
+            return
     
     def get_country_numbers(self, country: str) -> List[str]:
         """Get all numbers from a country XLSX file"""
@@ -566,41 +566,41 @@ If you believe this is a mistake, please contact the administrator.
             
         except Exception as e:
             logger.error(f"❌ Error loading numbers for {country}: {e}")
-        return
+            return
     
     def is_number_in_cooldown(self, number: str) -> bool:
         """Check if number is in 3-day cooldown period"""
         try:
             if not self.supabase:
-                return
+        return
                 
             result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
             
-        return
+                return
             
         except Exception as e:
             logger.error(f"❌ Error checking cooldown: {e}")
-        return
+            return
     
     def is_number_currently_assigned(self, number: str) -> bool:
         """Check if number is currently assigned to another user"""
         try:
             if not self.supabase:
-                return
+        return
                 
             result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
             
-        return
+                return
             
         except Exception as e:
             logger.error(f"❌ Error checking assignment: {e}")
-        return
+            return
     
     def assign_number_to_user(self, user_id: int, number: str, country: str) -> bool:
         """Assign number to user with concurrent protection"""
         try:
             if not self.supabase:
-                return
+        return
             
             # Double-check availability with database lock
             if self.is_number_currently_assigned(number):
@@ -627,21 +627,21 @@ If you believe this is a mistake, please contact the administrator.
             
             if result.data:
                 logger.info(f"✅ Number {number} assigned to user {user_id}")
-        return
+                return
             else:
                 logger.error(f"❌ Failed to assign number {number} to user {user_id}")
-        return
+                return
                 
         except Exception as e:
             logger.error(f"❌ Error assigning number: {e}")
-        return
+            return
 
     def get_next_available_number(self, country: str, user_id: int) -> Optional[str]:
         """Get next available number for a user with concurrent protection and cooldown check"""
         try:
             numbers = self.get_country_numbers(country)
             if not numbers:
-                return
+        return
             
             # Shuffle numbers to distribute load and avoid conflicts
             import random
@@ -651,22 +651,22 @@ If you believe this is a mistake, please contact the administrator.
             for number in numbers:
                 # Check if number is in cooldown
                 if self.is_number_in_cooldown(number):
-                    logger.info(f"⏰ Number {number} is in cooldown, skipping")
+        logger.info(f"⏰ Number {number} is in cooldown, skipping")
                     continue
                 
                 # Try to assign this number (with concurrent protection)
                 if self.assign_number_to_user(user_id, number, country):
-                    logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
-        return
+        logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
+                    return
                 else:
-                    logger.info(f"🔒 Number {number} already assigned, trying next")
+        logger.info(f"🔒 Number {number} already assigned, trying next")
             
             logger.warning(f"⚠️ No available numbers for {country} (all in use or cooldown)")
-        return
+                    return
             
         except Exception as e:
             logger.error(f"❌ Error getting available number: {e}")
-        return
+            return
     
     def release_number(self, country: str, number: str):
         """Release a number back to available pool"""
@@ -776,7 +776,7 @@ To use this bot, you need admin approval first.
         """Show available countries"""
         if not self.available_countries:
             await update.message.reply_text("❌ No countries available at the moment.")
-            return
+        return
         
         # Create inline keyboard for countries
         keyboard = []
@@ -1060,7 +1060,7 @@ Powered by TaskTreasure 🚀
                 "`/broadcast Your message here`\n\n"
                 "This will send your message to all bot users."
             )
-            return
+        return
         
         # Get message
         broadcast_message = " ".join(context.args)
@@ -1182,7 +1182,7 @@ From: TaskTreasure Support Team
         try:
             if len(context.args) != 1:
                 await update.message.reply_text("Usage: /approve <user_id>")
-        return
+            return
             
             user_id_to_approve = int(context.args[0])
             admin_id = update.effective_user.id
@@ -1208,7 +1208,7 @@ From: TaskTreasure Support Team
         try:
             if len(context.args) < 1:
                 await update.message.reply_text("Usage: /reject <user_id> [reason]")
-        return
+            return
             
             user_id_to_reject = int(context.args[0])
             reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Request rejected by admin"
@@ -1235,13 +1235,13 @@ From: TaskTreasure Support Team
         try:
             if len(context.args) != 1:
                 await update.message.reply_text("Usage: /remove <user_id>")
-        return
+            return
             
             user_id_to_remove = int(context.args[0])
             
             if not self.supabase:
                 await update.message.reply_text("❌ Database connection error.")
-        return
+                return
             
             # Deactivate user
             result = self.supabase.table('approved_users').update({
@@ -1254,8 +1254,8 @@ From: TaskTreasure Support Team
                 
                 # Notify user
             try:
-        if self.application:
-            await self.application.bot.send_message(
+                if self.application:
+                    await self.application.bot.send_message(
             chat_id=user_id_to_remove,
             text="""
 🚫 **Access Revoked** 🚫
@@ -1286,14 +1286,14 @@ If you believe this is a mistake, please contact the administrator.
         try:
             if not self.supabase:
                 await update.message.reply_text("❌ Database connection error.")
-        return
+            return
             
             # Get pending requests
             result = self.supabase.table('user_approval_requests').select('*').eq('status', 'pending').order('requested_at', desc=True).execute()
             
             if not result.data:
                 await update.message.reply_text("📝 No pending approval requests.")
-        return
+                return
             
             message = "📋 **Pending Approval Requests:**\n\n"
             for i, req in enumerate(result.data[:10], 1):  # Limit to 10 requests
@@ -1329,14 +1329,14 @@ If you believe this is a mistake, please contact the administrator.
         try:
             if not self.supabase:
                 await update.message.reply_text("❌ Database connection error.")
-        return
+            return
             
             # Get approved users
             result = self.supabase.table('approved_users').select('*').eq('is_active', True).order('approved_at', desc=True).execute()
             
             if not result.data:
                 await update.message.reply_text("👥 No approved users found.")
-        return
+                return
             
             message = f"👥 **Approved Users ({len(result.data)}):**\n\n"
             for i, user in enumerate(result.data[:15], 1):  # Limit to 15 users
@@ -1419,8 +1419,8 @@ If you believe this is a mistake, please contact the administrator.
             number_column = None
             
             for col in df.columns:
-        if col.lower() in required_columns:
-            number_column = col
+                if col.lower() in required_columns:
+                    number_column = col
             column_found = True
             break
             
@@ -1448,7 +1448,7 @@ If you believe this is a mistake, please contact the administrator.
             if success_rate < 50:
                 return
             
-        return
+                return
             
         except Exception as e:
             return
@@ -1475,12 +1475,12 @@ If you believe this is a mistake, please contact the administrator.
             
             # Update available countries list
             if country_name not in self.available_countries:
-            self.available_countries.append(country_name)
+                self.available_countries.append(country_name)
             logger.info(f"🆕 Added new country: {country_name}")
             
             # Initialize number tracking for new country
             if country_name not in self.country_number_indices:
-            self.country_number_indices[country_name] = 0
+                self.country_number_indices[country_name] = 0
         self.assigned_numbers[country_name] = set()
             logger.info(f"🔢 Initialized number tracking for: {country_name}")
             
@@ -1488,20 +1488,20 @@ If you believe this is a mistake, please contact the administrator.
             if backup_path and os.path.exists(backup_path):
                 os.remove(backup_path)
             
-        return
+                return
             
         except Exception as e:
             logger.error(f"❌ Error processing country file: {e}")
             
             # Restore backup if something went wrong
             if backup_path and os.path.exists(backup_path):
-        try:
-            shutil.move(backup_path, target_path)
+                try:
+                    shutil.move(backup_path, target_path)
             logger.info("🔄 Restored backup file due to error")
             except Exception:
                 pass
             
-        return
+                return
     
     async def admin_upload_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to upload country file"""
@@ -1551,7 +1551,7 @@ number
         try:
             if not self.available_countries:
                 await update.message.reply_text("📁 No countries available.")
-        return
+            return
             
             message = f"🌍 **Available Countries ({len(self.available_countries)}):**\n\n"
             
@@ -1603,24 +1603,24 @@ number
         try:
             if len(context.args) != 1:
                 await update.message.reply_text("Usage: /delete_country <country_name>")
-        return
+            return
             
             country_name = context.args[0]
             file_path = os.path.join(self.countries_dir, f"{country_name}.xlsx")
             
             if not os.path.exists(file_path):
                 await update.message.reply_text(f"❌ Country '{country_name}' not found.")
-        return
+                return
             
             # Check if country has active users
             active_users = 0
             for user_id, session in self.user_sessions.items():
-        if session.get('country') == country_name:
-            active_users += 1
+                if session.get('country') == country_name:
+                    active_users += 1
             
             if active_users > 0:
                 await update.message.reply_text(f"⚠️ Cannot delete '{country_name}' - {active_users} users are currently using numbers from this country.")
-        return
+                    return
             
             # Create backup before deletion
             backup_path = f"{file_path}.deleted_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -1631,7 +1631,7 @@ number
             
             # Remove from available countries
             if country_name in self.available_countries:
-            self.available_countries.remove(country_name)
+                self.available_countries.remove(country_name)
             
             # Clean up tracking data
             if country_name in self.country_number_indices:
@@ -1694,7 +1694,7 @@ The file has been backed up before deletion.
         # Only admin can upload files
         if not self.is_admin(user_id):
             await update.message.reply_text("❌ Only admin can upload country files.")
-        return
+            return
         
         document = update.message.document
         caption = update.message.caption or ""
@@ -1702,7 +1702,7 @@ The file has been backed up before deletion.
         # Check if it's an Excel file
         if not document.file_name.endswith(('.xlsx', '.xls')):
             await update.message.reply_text("❌ Please upload an Excel file (.xlsx or .xls)")
-        return
+            return
         
         # Get country name from caption
         country_name = caption.strip()
@@ -1720,7 +1720,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
         # Validate country name
         if not re.match(r'^[a-zA-Z\s]+$', country_name):
             await update.message.reply_text("❌ Country name should only contain letters and spaces.")
-        return
+            return
         
         try:
             await update.message.reply_text("📥 **Processing file...** Please wait...")
@@ -1743,7 +1743,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
             if not is_valid:
                 os.unlink(temp_path)
         await update.message.reply_text(f"❌ **File Validation Failed**\n\n{message}")
-        return
+                return
             
             # Check if country exists
             country_exists = country_name in self.available_countries
@@ -1790,7 +1790,7 @@ Send Tunisia.xlsx with caption: "Tunisia"
             # Check if user is already approved
         if await self.is_user_approved(user_id):
             await update.message.reply_text("✅ You are already approved! Use /start to access the main menu.")
-        return
+            return
             
             # Check cooldown
         cooldown_end = await self.check_request_cooldown(user_id)
@@ -1829,7 +1829,7 @@ Please wait for admin approval. You will be notified once a decision is made.
 """)
             else:
                 await update.message.reply_text("❌ Error submitting request. Please try again later.")
-        return
+                return
         
         # Check if user is approved for all other commands
         if not await self.is_user_approved(user_id):
@@ -1878,7 +1878,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             
             if not self.is_admin(admin_id):
                 await query.edit_message_text("❌ You are not authorized to perform this action.")
-        return
+                return
             
         if await self.approve_user(user_id_to_approve, admin_id):
             await self.notify_user_approval_result(user_id_to_approve, True)
@@ -1886,7 +1886,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve}")
             else:
                 await query.edit_message_text("❌ Error approving user. Please try again.")
-        return
+                return
         
         elif query.data.startswith("reject_"):
             user_id_to_reject = int(query.data.split("_")[1])
@@ -1894,7 +1894,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             
             if not self.is_admin(admin_id):
                 await query.edit_message_text("❌ You are not authorized to perform this action.")
-        return
+                return
             
         if await self.reject_user(user_id_to_reject, admin_id, "Request rejected by admin"):
             await self.notify_user_approval_result(user_id_to_reject, False, "Request rejected by admin")
@@ -1902,13 +1902,13 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject}")
             else:
                 await query.edit_message_text("❌ Error rejecting user. Please try again.")
-        return
+                return
         
         # Check if user is approved for other callback actions
         user_id = query.from_user.id
         if not await self.is_user_approved(user_id):
             await query.edit_message_text("🔐 You need admin approval to use this bot. Please request access first.")
-        return
+            return
         
         # Handle approved user callback queries
         if query.data.startswith("country_"):
@@ -1999,7 +1999,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                 if session_number == number and session.get('waiting_for_otp'):
                     target_user = user_id
                     target_country = session.get('country', 'Unknown')
-                    logger.info(f"✅ EXACT MATCH: User {user_id} found for number {number}")
+        logger.info(f"✅ EXACT MATCH: User {user_id} found for number {number}")
                     break
             
             # Try fuzzy match (remove formatting)
@@ -2013,7 +2013,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                     if clean_session == clean_incoming and session.get('waiting_for_otp'):
                         target_user = user_id
                         target_country = session.get('country', 'Unknown')
-                        logger.info(f"✅ FUZZY MATCH: User {user_id} found. Session: {session_number} → {clean_session}")
+        logger.info(f"✅ FUZZY MATCH: User {user_id} found. Session: {session_number} → {clean_session}")
                         break
             
             if not target_user:
