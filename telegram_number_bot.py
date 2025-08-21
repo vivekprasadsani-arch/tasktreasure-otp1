@@ -585,15 +585,14 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is currently assigned to another user"""
         try:
             if not self.supabase:
-                return
+                return False
                 
             result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
-            
-                return
+            return len(result.data) > 0 if result.data else False
             
         except Exception as e:
             logger.error(f"❌ Error checking assignment: {e}")
-            return
+            return False
     
     def assign_number_to_user(self, user_id: int, number: str, country: str) -> bool:
         """Assign number to user with concurrent protection"""
@@ -656,16 +655,16 @@ If you believe this is a mistake, please contact the administrator.
                 # Try to assign this number (with concurrent protection)
                 if self.assign_number_to_user(user_id, number, country):
                     logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
-                    return
+                    return number
                 else:
                     logger.info(f"🔒 Number {number} already assigned, trying next")
             
             logger.warning(f"⚠️ No available numbers for {country} (all in use or cooldown)")
-                    return
+            return None
             
         except Exception as e:
             logger.error(f"❌ Error getting available number: {e}")
-            return
+            return None
     
     def release_number(self, country: str, number: str):
         """Release a number back to available pool"""
@@ -1187,7 +1186,7 @@ From: TaskTreasure Support Team
             admin_id = update.effective_user.id
             
             if await self.approve_user(user_id_to_approve, admin_id):
-            await self.notify_user_approval_result(user_id_to_approve, True)
+                await self.notify_user_approval_result(user_id_to_approve, True)
         await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
             logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
             else:
@@ -1214,7 +1213,7 @@ From: TaskTreasure Support Team
             admin_id = update.effective_user.id
             
             if await self.reject_user(user_id_to_reject, admin_id, reason):
-            await self.notify_user_approval_result(user_id_to_reject, False, reason)
+                await self.notify_user_approval_result(user_id_to_reject, False, reason)
         await update.message.reply_text(f"❌ User {user_id_to_reject} has been rejected.\nReason: {reason}")
             logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject} via command")
             else:
@@ -1500,13 +1499,13 @@ If you believe this is a mistake, please contact the administrator.
             except Exception:
                 pass
             
-                    return
+                return
     
     async def admin_upload_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to upload country file"""
                     if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
-                    return
+                        await update.message.reply_text("❌ You are not authorized to use this command.")
+                        return
         
         await update.message.reply_text("""
 📁 **Upload Country Numbers File**
@@ -1544,7 +1543,7 @@ number
     async def admin_list_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to list all available countries"""
                     if not self.is_admin(update.effective_user.id):
-            await update.message.reply_text("❌ You are not authorized to use this command.")
+                        await update.message.reply_text("❌ You are not authorized to use this command.")
         return
         
         try:
@@ -1619,7 +1618,7 @@ number
             
             if active_users > 0:
                 await update.message.reply_text(f"⚠️ Cannot delete '{country_name}' - {active_users} users are currently using numbers from this country.")
-                    return
+                return
             
             # Create backup before deletion
             backup_path = f"{file_path}.deleted_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
