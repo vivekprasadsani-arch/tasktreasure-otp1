@@ -211,13 +211,13 @@ class TelegramNumberBot:
                 return
             
             if not self.supabase:
-                return
+                return False
             
             result = self.supabase.table('approved_users').select('*').eq('user_id', user_id).eq('is_active', True).execute()
             return len(result.data) > 0
         except Exception as e:
             logger.error(f"❌ Error checking user approval: {e}")
-            return
+            return False
     
     async def check_request_cooldown(self, user_id: int) -> Optional[datetime]:
         """Check if user is in cooldown period, returns cooldown end time if in cooldown"""
@@ -534,11 +534,11 @@ If you believe this is a mistake, please contact the administrator.
         try:
             if self.supabase:
                 result = self.supabase.table('user_sessions').select('user_id').execute()
-        return
-            return
+                return [user['user_id'] for user in result.data] if result.data else []
+            return []
         except Exception as e:
             logger.error(f"❌ Error getting all users: {e}")
-            return
+            return []
     
     def get_country_numbers(self, country: str) -> List[str]:
         """Get all numbers from a country XLSX file"""
@@ -562,7 +562,7 @@ If you believe this is a mistake, please contact the administrator.
                         numbers.append(clean_number)
             
             logger.info(f"📞 Loaded {len(numbers)} numbers for {country}")
-        return
+            return
             
         except Exception as e:
             logger.error(f"❌ Error loading numbers for {country}: {e}")
@@ -572,15 +572,14 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is in 3-day cooldown period"""
         try:
             if not self.supabase:
-                return
+                return False
                 
             result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
-            
-                return
+            return len(result.data) > 0 if result.data else False
             
         except Exception as e:
             logger.error(f"❌ Error checking cooldown: {e}")
-            return
+            return False
     
     def is_number_currently_assigned(self, number: str) -> bool:
         """Check if number is currently assigned to another user"""
@@ -1187,7 +1186,7 @@ From: TaskTreasure Support Team
             user_id_to_approve = int(context.args[0])
             admin_id = update.effective_user.id
             
-        if await self.approve_user(user_id_to_approve, admin_id):
+            if await self.approve_user(user_id_to_approve, admin_id):
             await self.notify_user_approval_result(user_id_to_approve, True)
         await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
             logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
@@ -1214,7 +1213,7 @@ From: TaskTreasure Support Team
             reason = " ".join(context.args[1:]) if len(context.args) > 1 else "Request rejected by admin"
             admin_id = update.effective_user.id
             
-        if await self.reject_user(user_id_to_reject, admin_id, reason):
+            if await self.reject_user(user_id_to_reject, admin_id, reason):
             await self.notify_user_approval_result(user_id_to_reject, False, reason)
         await update.message.reply_text(f"❌ User {user_id_to_reject} has been rejected.\nReason: {reason}")
             logger.info(f"❌ Admin {admin_id} rejected user {user_id_to_reject} via command")
@@ -1481,7 +1480,7 @@ If you believe this is a mistake, please contact the administrator.
             # Initialize number tracking for new country
             if country_name not in self.country_number_indices:
                 self.country_number_indices[country_name] = 0
-        self.assigned_numbers[country_name] = set()
+            self.assigned_numbers[country_name] = set()
             logger.info(f"🔢 Initialized number tracking for: {country_name}")
             
             # Remove backup if everything succeeded
@@ -1497,17 +1496,17 @@ If you believe this is a mistake, please contact the administrator.
             if backup_path and os.path.exists(backup_path):
                 try:
                     shutil.move(backup_path, target_path)
-            logger.info("🔄 Restored backup file due to error")
+                    logger.info("🔄 Restored backup file due to error")
             except Exception:
                 pass
             
-                return
+                    return
     
     async def admin_upload_country(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to upload country file"""
-        if not self.is_admin(update.effective_user.id):
+                    if not self.is_admin(update.effective_user.id):
             await update.message.reply_text("❌ You are not authorized to use this command.")
-        return
+                    return
         
         await update.message.reply_text("""
 📁 **Upload Country Numbers File**
@@ -1544,7 +1543,7 @@ number
     
     async def admin_list_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to list all available countries"""
-        if not self.is_admin(update.effective_user.id):
+                    if not self.is_admin(update.effective_user.id):
             await update.message.reply_text("❌ You are not authorized to use this command.")
         return
         
@@ -1665,8 +1664,8 @@ The file has been backed up before deletion.
             old_count = len(self.available_countries)
             
             # Reload countries
-        self.load_countries()
-        self.load_number_states()
+            self.load_countries()
+            self.load_number_states()
             
             new_count = len(self.available_countries)
             
@@ -2056,7 +2055,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
             app = Application.builder().token(self.bot_token).build()
             
             # Store application reference for admin notifications
-        self.application = app
+            self.application = app
             
             # Add handlers
             app.add_handler(CommandHandler("start", self.start_command))
