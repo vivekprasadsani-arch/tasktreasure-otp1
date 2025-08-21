@@ -1187,8 +1187,8 @@ From: TaskTreasure Support Team
             
             if await self.approve_user(user_id_to_approve, admin_id):
                 await self.notify_user_approval_result(user_id_to_approve, True)
-        await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
-            logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
+                await update.message.reply_text(f"✅ User {user_id_to_approve} has been approved successfully!")
+                logger.info(f"✅ Admin {admin_id} approved user {user_id_to_approve} via command")
             else:
                 await update.message.reply_text("❌ Error approving user. User may not exist or already approved.")
         except ValueError:
