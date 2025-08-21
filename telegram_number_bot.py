@@ -127,9 +127,9 @@ class TelegramNumberBot:
                 result = self.supabase.table('admin_settings').select('setting_value').eq('setting_key', 'admin_user_id').execute()
                 if result.data:
                     self.admin_user_id = int(result.data[0]['setting_value'])
-            logger.info(f"✅ Admin user loaded from database: {self.admin_user_id}")
+                    logger.info(f"✅ Admin user loaded from database: {self.admin_user_id}")
                 else:
-                logger.warning("⚠️ No admin user configured in database")
+                    logger.warning("⚠️ No admin user configured in database")
             else:
                 logger.warning("⚠️ No admin user configured - neither environment nor database")
         except Exception as e:
@@ -278,8 +278,8 @@ class TelegramNumberBot:
             
             # Escape HTML special characters
             def escape_html(text):
-                if not text:
-                    return
+        if not text:
+        return
         return
             
             first_name = escape_html(user_data.get('first_name', 'N/A'))
@@ -1254,8 +1254,8 @@ From: TaskTreasure Support Team
                 
                 # Notify user
             try:
-                if self.application:
-                    await self.application.bot.send_message(
+        if self.application:
+            await self.application.bot.send_message(
             chat_id=user_id_to_remove,
             text="""
 🚫 **Access Revoked** 🚫
@@ -1419,8 +1419,8 @@ If you believe this is a mistake, please contact the administrator.
             number_column = None
             
             for col in df.columns:
-                if col.lower() in required_columns:
-                    number_column = col
+        if col.lower() in required_columns:
+            number_column = col
             column_found = True
             break
             
@@ -1475,12 +1475,12 @@ If you believe this is a mistake, please contact the administrator.
             
             # Update available countries list
             if country_name not in self.available_countries:
-                self.available_countries.append(country_name)
+            self.available_countries.append(country_name)
             logger.info(f"🆕 Added new country: {country_name}")
             
             # Initialize number tracking for new country
             if country_name not in self.country_number_indices:
-                self.country_number_indices[country_name] = 0
+            self.country_number_indices[country_name] = 0
         self.assigned_numbers[country_name] = set()
             logger.info(f"🔢 Initialized number tracking for: {country_name}")
             
@@ -1495,8 +1495,8 @@ If you believe this is a mistake, please contact the administrator.
             
             # Restore backup if something went wrong
             if backup_path and os.path.exists(backup_path):
-                try:
-                    shutil.move(backup_path, target_path)
+        try:
+            shutil.move(backup_path, target_path)
             logger.info("🔄 Restored backup file due to error")
             except Exception:
                 pass
@@ -1615,8 +1615,8 @@ number
             # Check if country has active users
             active_users = 0
             for user_id, session in self.user_sessions.items():
-                if session.get('country') == country_name:
-                    active_users += 1
+        if session.get('country') == country_name:
+            active_users += 1
             
             if active_users > 0:
                 await update.message.reply_text(f"⚠️ Cannot delete '{country_name}' - {active_users} users are currently using numbers from this country.")
@@ -1631,7 +1631,7 @@ number
             
             # Remove from available countries
             if country_name in self.available_countries:
-                self.available_countries.remove(country_name)
+            self.available_countries.remove(country_name)
             
             # Clean up tracking data
             if country_name in self.country_number_indices:
