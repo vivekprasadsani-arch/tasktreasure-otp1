@@ -711,9 +711,9 @@ Hi {user_name}! 👋
         
         await update.message.reply_text(
             welcome_message,
-            reply_markup=reply_markup
+                reply_markup=reply_markup
             )
-        return
+            return
         
         # Check if user is in cooldown
         cooldown_end = await self.check_request_cooldown(user_id)
