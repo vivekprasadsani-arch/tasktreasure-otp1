@@ -183,7 +183,7 @@ class TelegramNumberBot:
                 result = self.supabase.table('user_sessions').select('*').eq('waiting_for_otp', True).execute()
                 for session in result.data:
                     user_id = session['user_id']
-        self.user_sessions[user_id] = {
+                    self.user_sessions[user_id] = {
                         'country': session['country'],
                         'number': session['number'],
                         'assigned_at': session['assigned_at'],
@@ -194,7 +194,7 @@ class TelegramNumberBot:
                     country = session['country']
                     number = session['number']
                     if country in self.assigned_numbers:
-        self.assigned_numbers[country].add(number)
+                        self.assigned_numbers[country].add(number)
                 
                 logger.info(f"✅ Restored {len(result.data)} user sessions from database")
         except Exception as e:
@@ -202,19 +202,19 @@ class TelegramNumberBot:
     
     def is_admin(self, user_id: int) -> bool:
         """Check if user is admin"""
-            return self.admin_user_id and user_id == self.admin_user_id
+        return self.admin_user_id and user_id == self.admin_user_id
     
     async def is_user_approved(self, user_id: int) -> bool:
         """Check if user is approved to use the bot"""
         try:
             if self.is_admin(user_id):
-        return
+                return
             
             if not self.supabase:
-            return
+                return
             
             result = self.supabase.table('approved_users').select('*').eq('user_id', user_id).eq('is_active', True).execute()
-                return
+            return len(result.data) > 0
         except Exception as e:
             logger.error(f"❌ Error checking user approval: {e}")
             return
@@ -223,23 +223,23 @@ class TelegramNumberBot:
         """Check if user is in cooldown period, returns cooldown end time if in cooldown"""
         try:
             if not self.supabase:
-        return
+                return
             
             result = self.supabase.table('user_approval_requests').select('next_request_allowed_at').eq('user_id', user_id).execute()
             if result.data:
                 cooldown_end = datetime.fromisoformat(result.data[0]['next_request_allowed_at'].replace('Z', '+00:00'))
-            if cooldown_end > datetime.now():
-                return
-                return
+                if cooldown_end > datetime.now():
+                    return cooldown_end
+            return None
         except Exception as e:
             logger.error(f"❌ Error checking request cooldown: {e}")
-                return
+            return None
     
     async def create_approval_request(self, user_id: int, user_data: dict):
         """Create a new approval request"""
         try:
             if not self.supabase:
-        return
+                return
             
             # Set next allowed request time (3 hours from now)
             next_allowed = datetime.now() + timedelta(hours=3)
@@ -279,7 +279,7 @@ class TelegramNumberBot:
             # Escape HTML special characters
             def escape_html(text):
                 if not text:
-                return
+                    return
                 return
             
             first_name = escape_html(user_data.get('first_name', 'N/A'))
@@ -349,7 +349,7 @@ Choose an action:"""
         """Approve user access"""
         try:
             if not self.supabase:
-        return
+                return
             
             # Get user request data
             request_result = self.supabase.table('user_approval_requests').select('*').eq('user_id', user_id).execute()
@@ -385,7 +385,7 @@ Choose an action:"""
         """Reject user access"""
         try:
             if not self.supabase:
-        return
+                return
             
             # Update request status
         self.supabase.table('user_approval_requests').update({
@@ -404,7 +404,7 @@ Choose an action:"""
         """Notify user about approval/rejection result"""
         try:
             if not self.application:
-        return
+                return
             
             if approved:
                 message = """
@@ -456,7 +456,7 @@ If you believe this is a mistake, please contact the administrator.
         """Add number to 3-day cooldown after receiving OTP"""
         try:
             if not self.supabase:
-        return
+                return
             
             # Remove any existing cooldown for this number
             self.supabase.table('otp_cooldown').delete().eq('number', number).execute()
@@ -572,7 +572,7 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is in 3-day cooldown period"""
         try:
             if not self.supabase:
-        return
+                return
                 
             result = self.supabase.table('otp_cooldown').select('*').eq('number', number).gte('cooldown_until', datetime.now().isoformat()).execute()
             
@@ -586,7 +586,7 @@ If you believe this is a mistake, please contact the administrator.
         """Check if number is currently assigned to another user"""
         try:
             if not self.supabase:
-        return
+                return
                 
             result = self.supabase.table('number_assignments').select('*').eq('number', number).eq('is_active', True).gte('expires_at', datetime.now().isoformat()).execute()
             
@@ -600,7 +600,7 @@ If you believe this is a mistake, please contact the administrator.
         """Assign number to user with concurrent protection"""
         try:
             if not self.supabase:
-        return
+                return
             
             # Double-check availability with database lock
             if self.is_number_currently_assigned(number):
@@ -641,7 +641,7 @@ If you believe this is a mistake, please contact the administrator.
         try:
             numbers = self.get_country_numbers(country)
             if not numbers:
-        return
+                return
             
             # Shuffle numbers to distribute load and avoid conflicts
             import random
@@ -651,15 +651,15 @@ If you believe this is a mistake, please contact the administrator.
             for number in numbers:
                 # Check if number is in cooldown
                 if self.is_number_in_cooldown(number):
-        logger.info(f"⏰ Number {number} is in cooldown, skipping")
+                    logger.info(f"⏰ Number {number} is in cooldown, skipping")
                     continue
                 
                 # Try to assign this number (with concurrent protection)
                 if self.assign_number_to_user(user_id, number, country):
-        logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
+                    logger.info(f"📱 Successfully assigned {number} from {country} to user {user_id}")
                     return
                 else:
-        logger.info(f"🔒 Number {number} already assigned, trying next")
+                    logger.info(f"🔒 Number {number} already assigned, trying next")
             
             logger.warning(f"⚠️ No available numbers for {country} (all in use or cooldown)")
                     return
@@ -776,7 +776,7 @@ To use this bot, you need admin approval first.
         """Show available countries"""
         if not self.available_countries:
             await update.message.reply_text("❌ No countries available at the moment.")
-        return
+            return
         
         # Create inline keyboard for countries
         keyboard = []
@@ -1060,7 +1060,7 @@ Powered by TaskTreasure 🚀
                 "`/broadcast Your message here`\n\n"
                 "This will send your message to all bot users."
             )
-        return
+            return
         
         # Get message
         broadcast_message = " ".join(context.args)
@@ -1999,7 +1999,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                 if session_number == number and session.get('waiting_for_otp'):
                     target_user = user_id
                     target_country = session.get('country', 'Unknown')
-        logger.info(f"✅ EXACT MATCH: User {user_id} found for number {number}")
+                    logger.info(f"✅ EXACT MATCH: User {user_id} found for number {number}")
                     break
             
             # Try fuzzy match (remove formatting)
@@ -2013,7 +2013,7 @@ Please click "🔑 Request Access" to submit your request, or use /start to see 
                     if clean_session == clean_incoming and session.get('waiting_for_otp'):
                         target_user = user_id
                         target_country = session.get('country', 'Unknown')
-        logger.info(f"✅ FUZZY MATCH: User {user_id} found. Session: {session_number} → {clean_session}")
+                        logger.info(f"✅ FUZZY MATCH: User {user_id} found. Session: {session_number} → {clean_session}")
                         break
             
             if not target_user:
