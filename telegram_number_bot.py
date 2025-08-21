@@ -388,17 +388,17 @@ Choose an action:"""
                 return
             
             # Update request status
-        self.supabase.table('user_approval_requests').update({
+            self.supabase.table('user_approval_requests').update({
             'status': 'rejected',
             'approved_by': admin_id,
             'rejection_reason': reason
             }).eq('user_id', user_id).execute()
             
             logger.info(f"❌ User {user_id} rejected by admin {admin_id}")
-        return
+            return True
         except Exception as e:
             logger.error(f"❌ Error rejecting user: {e}")
-            return
+            return False
     
     async def notify_user_approval_result(self, user_id: int, approved: bool, reason: str = None):
         """Notify user about approval/rejection result"""
@@ -422,14 +422,14 @@ You can now use the bot to get phone numbers and receive OTP codes.
 <b>Choose an option from the menu below:</b>
 """
                 # Create main menu keyboard
-            keyboard = [
-            [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
-            [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
-            ]
-            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+                keyboard = [
+                    [KeyboardButton("📱 Get Number"), KeyboardButton("🔄 Change Number")],
+                    [KeyboardButton("📊 My Status"), KeyboardButton("ℹ️ Help")]
+                ]
+                reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
             else:
                 reason_escaped = reason.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') if reason else 'No specific reason provided'
-            message = f"""
+                message = f"""
 😔 <b>Request Rejected</b> 😔
 
 ❌ Your access request has been <b>REJECTED</b> by admin.
