@@ -256,10 +256,10 @@ class TelegramNumberBot:
             # Upsert the request
             result = self.supabase.table('user_approval_requests').upsert(request_data, on_conflict='user_id').execute()
             logger.info(f"📝 Created approval request for user {user_id}")
-        return
+            return True
         except Exception as e:
             logger.error(f"❌ Error creating approval request: {e}")
-            return
+            return False
     
     async def notify_admin_new_request(self, user_id: int, user_data: dict):
         """Notify admin about new user request"""
@@ -327,23 +327,23 @@ class TelegramNumberBot:
 
 Choose an action:"""
                 
-            keyboard = [
-            [
-            InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
-            ]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Approve", callback_data=f"approve_{user_id}"),
+                        InlineKeyboardButton("❌ Reject", callback_data=f"reject_{user_id}")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
                 
                 await self.application.bot.send_message(
-            chat_id=self.admin_user_id,
-            text=simple_message,
-            reply_markup=reply_markup
-            )
-            logger.info(f"✅ Fallback notification sent to admin {self.admin_user_id}")
+                    chat_id=self.admin_user_id,
+                    text=simple_message,
+                    reply_markup=reply_markup
+                )
+                logger.info(f"✅ Fallback notification sent to admin {self.admin_user_id}")
             except Exception as fallback_error:
                 logger.error(f"❌ Fallback notification also failed: {fallback_error}")
-            logger.error(f"❌ Admin ID: {self.admin_user_id}, App available: {self.application is not None}")
+                logger.error(f"❌ Admin ID: {self.admin_user_id}, App available: {self.application is not None}")
     
     async def approve_user(self, user_id: int, admin_id: int):
         """Approve user access"""
@@ -366,20 +366,20 @@ Choose an action:"""
             'last_name': request_data.get('last_name'),
             'approved_by': admin_id
             }
-        self.supabase.table('approved_users').upsert(approved_data, on_conflict='user_id').execute()
+            self.supabase.table('approved_users').upsert(approved_data, on_conflict='user_id').execute()
             
             # Update request status
-        self.supabase.table('user_approval_requests').update({
+            self.supabase.table('user_approval_requests').update({
             'status': 'approved',
             'approved_at': datetime.now().isoformat(),
             'approved_by': admin_id
             }).eq('user_id', user_id).execute()
             
             logger.info(f"✅ User {user_id} approved by admin {admin_id}")
-        return
+            return True
         except Exception as e:
             logger.error(f"❌ Error approving user: {e}")
-            return
+            return False
     
     async def reject_user(self, user_id: int, admin_id: int, reason: str = "Request rejected"):
         """Reject user access"""
