@@ -11,6 +11,7 @@ import asyncio
 import logging
 import re
 import pandas as pd
+import io
 from typing import Dict, List, Optional, Set
 from datetime import datetime, timedelta
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
@@ -26,28 +27,16 @@ logger = logging.getLogger(__name__)
 
 class TelegramNumberBot:
     def __init__(self):
-        # Load environment variables
         self.bot_token = os.getenv('BOT_TOKEN')
         if not self.bot_token:
             logger.error("❌ BOT_TOKEN environment variable not set!")
             raise ValueError("BOT_TOKEN environment variable is required")
-        
         self.channel_id = "-1002724043027"
         
-        # Supabase configuration from environment variables
-        self.supabase_url = os.getenv('SUPABASE_URL', "https://wddcrtrgirhcemmobgcc.supabase.co")
-        self.supabase_key = os.getenv('SUPABASE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI")
+        # Supabase configuration
+        self.supabase_url = "https://wddcrtrgirhcemmobgcc.supabase.co"
+        self.supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndkZGNydHJnaXJoY2VtbW9iZ2NjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTUzNjA1NTYsImV4cCI6MjA3MDkzNjU1Nn0.K5vpqoc_zakEwBd96aC-drJ5OoInTSFcrMlWy7ShIyI"
         self.supabase: Client = None
-        
-        # Admin User ID from environment (with fallback)
-        self.admin_user_id_env = os.getenv('ADMIN_USER_ID')
-        
-        # Debug logging for environment variables
-        logger.info(f"🔧 Environment Variables:")
-        logger.info(f"   BOT_TOKEN: {'✅ Set' if self.bot_token else '❌ Missing'}")
-        logger.info(f"   SUPABASE_URL: {'✅ Set' if self.supabase_url else '❌ Missing'}")
-        logger.info(f"   SUPABASE_KEY: {'✅ Set' if self.supabase_key else '❌ Missing'}")
-        logger.info(f"   ADMIN_USER_ID: {'✅ Set' if self.admin_user_id_env else '❌ Missing'}")
         
         # Countries directory
         self.countries_dir = "Countries"
@@ -119,76 +108,17 @@ class TelegramNumberBot:
             logger.error(f"❌ Error initializing number states: {e}")
     
     def load_admin_settings(self):
-        """Load admin settings from environment or database"""
+        """Load admin settings from database"""
         try:
-            # First try to load from environment variable
-            if self.admin_user_id_env:
-                try:
-                    self.admin_user_id = int(self.admin_user_id_env)
-                    logger.info(f"✅ Admin user loaded from ENV: {self.admin_user_id}")
-                    
-                    # Also update database with env value if possible
-                    if self.supabase:
-                        try:
-                            self.supabase.table('admin_settings').upsert({
-                                'setting_key': 'admin_user_id',
-                                'setting_value': str(self.admin_user_id)
-                            }, on_conflict='setting_key').execute()
-                            logger.info("✅ Database updated with env admin ID")
-                        except Exception as db_error:
-                            logger.warning(f"⚠️ Could not update database: {db_error}")
-                    return
-                except ValueError:
-                    logger.error(f"❌ Invalid ADMIN_USER_ID in environment: {self.admin_user_id_env}")
-            
-            # Fallback to database if env not available
             if self.supabase:
                 result = self.supabase.table('admin_settings').select('setting_value').eq('setting_key', 'admin_user_id').execute()
                 if result.data:
                     self.admin_user_id = int(result.data[0]['setting_value'])
-                    logger.info(f"✅ Admin user loaded from DB: {self.admin_user_id}")
+                    logger.info(f"✅ Admin user loaded: {self.admin_user_id}")
                 else:
-                    logger.warning("⚠️ No admin user configured in database")
-                    # Try to set default admin if not exists
-                    try:
-                        default_admin = "7325836764"  # Default admin ID
-                        self.supabase.table('admin_settings').insert({
-                            'setting_key': 'admin_user_id',
-                            'setting_value': default_admin
-                        }).execute()
-                        self.admin_user_id = int(default_admin)
-                        logger.info(f"✅ Default admin configured: {self.admin_user_id}")
-                    except Exception as insert_error:
-                        logger.error(f"❌ Failed to set default admin: {insert_error}")
+                    logger.warning("⚠️ No admin user configured")
         except Exception as e:
             logger.error(f"❌ Error loading admin settings: {e}")
-    
-    async def test_admin_notification(self, test_message: str = "Test notification from TaskTreasure OTP Bot") -> bool:
-        """Test admin notification system"""
-        try:
-            if not self.admin_user_id:
-                logger.error("❌ Cannot test - Admin User ID not configured")
-                return False
-                
-            if not self.bot_token:
-                logger.error("❌ Cannot test - Bot Token not configured")
-                return False
-                
-            import telegram
-            bot = telegram.Bot(token=self.bot_token)
-            
-            await bot.send_message(
-                chat_id=self.admin_user_id,
-                text=f"🧪 **System Test**\n\n{test_message}\n\nTime: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                parse_mode='Markdown'
-            )
-            
-            logger.info(f"✅ Admin notification test successful")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Admin notification test failed: {e}")
-            return False
     
     def format_phone_number(self, number: str, country: str = "") -> str:
         """Format phone number for display with proper spacing and country code"""
@@ -738,8 +668,7 @@ class TelegramNumberBot:
                 # Notify admin
                 if self.admin_user_id:
                     try:
-                        import telegram
-                        bot = telegram.Bot(token=self.bot_token)
+                        app = Application.builder().token(self.bot_token).build()
                         
                         admin_message = f"🔔 **New Access Request**\n\n"
                         admin_message += f"👤 **User:** {user_name}\n"
@@ -751,11 +680,7 @@ class TelegramNumberBot:
                         admin_message += f"`/approve {user_id}` - Approve user\n"
                         admin_message += f"`/reject {user_id}` - Reject user"
                         
-                        # Debug logging
-                        logger.info(f"🔍 DEBUG: Admin User ID = {self.admin_user_id}")
-                        logger.info(f"🔍 DEBUG: Bot Token = {self.bot_token[:10]}...{self.bot_token[-10:]}")
-                        
-                        await bot.send_message(
+                        await app.bot.send_message(
                             chat_id=self.admin_user_id,
                             text=admin_message,
                             parse_mode='Markdown'
@@ -765,20 +690,6 @@ class TelegramNumberBot:
                         
                     except Exception as e:
                         logger.error(f"❌ Failed to notify admin: {e}")
-                        logger.error(f"❌ Admin ID: {self.admin_user_id}, Bot Token exists: {bool(self.bot_token)}")
-                        
-                        # Try without markdown parsing as fallback
-                        try:
-                            simple_message = f"New Access Request from {user_name} (ID: {user_id})\n\nApprove: /approve {user_id}\nReject: /reject {user_id}"
-                            await bot.send_message(
-                                chat_id=self.admin_user_id,
-                                text=simple_message
-                            )
-                            logger.info(f"📢 Admin notified with simple message (fallback)")
-                        except Exception as fallback_error:
-                            logger.error(f"❌ Fallback notification also failed: {fallback_error}")
-                else:
-                    logger.error(f"❌ Admin User ID not configured: {self.admin_user_id}")
                 
                 await update.message.reply_text(
                     "📝 **Access Request Submitted**\n\n"
@@ -1215,23 +1126,22 @@ From: TaskTreasure Support Team
             success = await self.approve_user_request(user_request['id'], user_id, notes)
             
             if success:
-                                        # Notify the user
-                        try:
-                            import telegram
-                            bot = telegram.Bot(token=self.bot_token)
-                            
-                            user_message = "✅ **Access Approved!**\n\n"
-                            user_message += "Your request to use TaskTreasure OTP Bot has been approved by the admin.\n\n"
-                            user_message += "You can now use all bot features. Send /start to begin!"
-                            
-                            if notes:
-                                user_message += f"\n\n**Admin Notes:** {notes}"
-                            
-                            await bot.send_message(
-                                chat_id=target_user_id,
-                                text=user_message,
-                                parse_mode='Markdown'
-                            )
+                # Notify the user
+                try:
+                    app = Application.builder().token(self.bot_token).build()
+                    
+                    user_message = "✅ **Access Approved!**\n\n"
+                    user_message += "Your request to use TaskTreasure OTP Bot has been approved by the admin.\n\n"
+                    user_message += "You can now use all bot features. Send /start to begin!"
+                    
+                    if notes:
+                        user_message += f"\n\n**Admin Notes:** {notes}"
+                    
+                    await app.bot.send_message(
+                        chat_id=target_user_id,
+                        text=user_message,
+                        parse_mode='Markdown'
+                    )
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to notify approved user: {e}")
@@ -1291,23 +1201,22 @@ From: TaskTreasure Support Team
             success = await self.reject_user_request(user_request['id'], user_id, reason)
             
             if success:
-                                        # Notify the user
-                        try:
-                            import telegram
-                            bot = telegram.Bot(token=self.bot_token)
-                            
-                            user_message = "❌ **Access Request Rejected**\n\n"
-                            user_message += "Your request to use TaskTreasure OTP Bot has been rejected by the admin.\n\n"
-                            user_message += "You can request access again after the 3-hour cooldown period."
-                            
-                            if reason:
-                                user_message += f"\n\n**Reason:** {reason}"
-                            
-                            await bot.send_message(
-                                chat_id=target_user_id,
-                                text=user_message,
-                                parse_mode='Markdown'
-                            )
+                # Notify the user
+                try:
+                    app = Application.builder().token(self.bot_token).build()
+                    
+                    user_message = "❌ **Access Request Rejected**\n\n"
+                    user_message += "Your request to use TaskTreasure OTP Bot has been rejected by the admin.\n\n"
+                    user_message += "You can request access again after the 3-hour cooldown period."
+                    
+                    if reason:
+                        user_message += f"\n\n**Reason:** {reason}"
+                    
+                    await app.bot.send_message(
+                        chat_id=target_user_id,
+                        text=user_message,
+                        parse_mode='Markdown'
+                    )
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to notify rejected user: {e}")
@@ -1453,40 +1362,6 @@ From: TaskTreasure Support Team
             
         except Exception as e:
             await update.message.reply_text(f"❌ Error getting pending requests: {e}")
-    
-    async def admin_test_notification(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Admin command to test notification system"""
-        user_id = update.effective_user.id
-        
-        if not self.is_admin(user_id):
-            await update.message.reply_text("❌ You don't have permission to use this command.")
-            return
-        
-        try:
-            test_message = " ".join(context.args) if context.args else "Test notification"
-            
-            await update.message.reply_text("🧪 **Testing Admin Notification System...**")
-            
-            # Test the notification
-            success = await self.test_admin_notification(test_message)
-            
-            if success:
-                await update.message.reply_text(
-                    "✅ **Notification Test Successful!**\n\n"
-                    "Admin notification system is working correctly."
-                )
-            else:
-                await update.message.reply_text(
-                    "❌ **Notification Test Failed!**\n\n"
-                    "Please check:"
-                    "\n- Admin User ID configuration"
-                    "\n- Bot Token validity"
-                    "\n- Database connection"
-                    "\n\nCheck logs for more details."
-                )
-                
-        except Exception as e:
-            await update.message.reply_text(f"❌ Test failed with error: {e}")
     
     async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Admin command to show bot statistics"""
@@ -1742,6 +1617,191 @@ From: TaskTreasure Support Team
         except Exception as e:
             logger.error(f"❌ Error notifying user: {e}")
     
+    async def admin_upload_numbers(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to upload number files directly through bot"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ You don't have permission to use this command.")
+            return
+        
+        await update.message.reply_text(
+            "📤 **Number Upload System**\n\n"
+            "Send me an Excel file (.xlsx) with phone numbers.\n\n"
+            "**Instructions:**\n"
+            "• File name will be used as country name\n"
+            "• Example: `Jordan.xlsx` → Creates Jordan country\n"
+            "• Phone numbers should be in the first column\n"
+            "• One number per row\n\n"
+            "**Send the Excel file now:**",
+            parse_mode='Markdown'
+        )
+    
+    async def handle_document_upload(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle Excel file uploads for number management"""
+        user_id = update.effective_user.id
+        
+        # Only allow admin to upload files
+        if not self.is_admin(user_id):
+            await update.message.reply_text(
+                "❌ **Access Denied**\n\n"
+                "Only admin can upload number files.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        document = update.message.document
+        if not document:
+            return
+        
+        # Check file type
+        if not document.file_name.endswith('.xlsx'):
+            await update.message.reply_text(
+                "❌ **Invalid File Type**\n\n"
+                "Please send an Excel file (.xlsx) only.",
+                parse_mode='Markdown'
+            )
+            return
+        
+        try:
+            await update.message.reply_text(
+                "⏳ **Processing File...**\n\n"
+                f"Uploading: `{document.file_name}`",
+                parse_mode='Markdown'
+            )
+            
+            # Download the file
+            file = await context.bot.get_file(document.file_id)
+            
+            # Create file path
+            country_name = document.file_name.replace('.xlsx', '')
+            file_path = os.path.join(self.countries_dir, document.file_name)
+            
+            # Download file content to memory first
+            file_content = io.BytesIO()
+            await file.download_to_memory(file_content)
+            file_content.seek(0)
+            
+            # Validate Excel file by reading it
+            try:
+                df = pd.read_excel(file_content)
+                if df.empty:
+                    await update.message.reply_text(
+                        "❌ **Empty File**\n\n"
+                        "The Excel file contains no data.",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                # Count valid phone numbers
+                valid_numbers = 0
+                for value in df.iloc[:, 0]:
+                    if pd.notna(value):
+                        number_str = str(int(float(value))) if str(value).replace('.', '').replace('e', '').replace('+', '').replace('-', '').isdigit() else str(value)
+                        clean_number = ''.join(c for c in number_str if c.isdigit() or c == '+')
+                        if len(clean_number) > 5:
+                            valid_numbers += 1
+                
+                if valid_numbers == 0:
+                    await update.message.reply_text(
+                        "❌ **No Valid Numbers**\n\n"
+                        "No valid phone numbers found in the first column.",
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+            except Exception as validation_error:
+                await update.message.reply_text(
+                    f"❌ **File Validation Failed**\n\n"
+                    f"Error: {validation_error}",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            # Reset file content position
+            file_content.seek(0)
+            
+            # Save file to disk
+            with open(file_path, 'wb') as f:
+                f.write(file_content.read())
+            
+            # Reload countries to include new file
+            old_count = len(self.available_countries)
+            self.load_countries()
+            new_count = len(self.available_countries)
+            
+            # Check if country was added or updated
+            if country_name in self.available_countries:
+                status = "Updated" if old_count == new_count else "Added"
+                
+                await update.message.reply_text(
+                    f"✅ **Upload Successful!**\n\n"
+                    f"📁 **Country:** {country_name}\n"
+                    f"📊 **Numbers:** {valid_numbers} valid numbers\n"
+                    f"📈 **Status:** {status}\n"
+                    f"🌍 **Total Countries:** {len(self.available_countries)}\n\n"
+                    f"The numbers are now available for assignment!",
+                    parse_mode='Markdown'
+                )
+                
+                logger.info(f"✅ Admin uploaded {document.file_name}: {valid_numbers} numbers for {country_name}")
+                
+            else:
+                await update.message.reply_text(
+                    "⚠️ **Upload Warning**\n\n"
+                    "File was saved but country not detected in list. Please check the file format.",
+                    parse_mode='Markdown'
+                )
+            
+        except Exception as e:
+            logger.error(f"❌ Error processing uploaded file: {e}")
+            await update.message.reply_text(
+                f"❌ **Upload Failed**\n\n"
+                f"Error processing file: {str(e)}",
+                parse_mode='Markdown'
+            )
+    
+    async def admin_list_countries(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Admin command to list all available countries with number counts"""
+        user_id = update.effective_user.id
+        
+        if not self.is_admin(user_id):
+            await update.message.reply_text("❌ You don't have permission to use this command.")
+            return
+        
+        try:
+            if not self.available_countries:
+                await update.message.reply_text(
+                    "📂 **No Countries Available**\n\n"
+                    "Use `/upload` to add country files.",
+                    parse_mode='Markdown'
+                )
+                return
+            
+            message = "📂 **Available Countries:**\n\n"
+            
+            total_numbers = 0
+            for country in self.available_countries:
+                numbers = self.get_country_numbers(country)
+                assigned_count = len(self.assigned_numbers.get(country, set()))
+                available_count = len(numbers) - assigned_count
+                total_numbers += len(numbers)
+                
+                message += f"🌍 **{country}**\n"
+                message += f"   📊 Total: {len(numbers)}\n"
+                message += f"   ✅ Available: {available_count}\n"
+                message += f"   🔒 Assigned: {assigned_count}\n\n"
+            
+            message += f"📈 **Summary:**\n"
+            message += f"   Countries: {len(self.available_countries)}\n"
+            message += f"   Total Numbers: {total_numbers}\n"
+            message += f"   Currently Assigned: {sum(len(nums) for nums in self.assigned_numbers.values())}"
+            
+            await update.message.reply_text(message, parse_mode='Markdown')
+            
+        except Exception as e:
+            await update.message.reply_text(f"❌ Error listing countries: {e}")
+    
     async def run_bot(self):
         """Run the Telegram bot"""
         try:
@@ -1757,7 +1817,9 @@ From: TaskTreasure Support Team
             app.add_handler(CommandHandler("adduser", self.admin_add_user))
             app.add_handler(CommandHandler("removeuser", self.admin_remove_user))
             app.add_handler(CommandHandler("pending", self.admin_pending))
-            app.add_handler(CommandHandler("testnotify", self.admin_test_notification))
+            app.add_handler(CommandHandler("upload", self.admin_upload_numbers))
+            app.add_handler(CommandHandler("countries", self.admin_list_countries))
+            app.add_handler(MessageHandler(filters.Document.FileExtension("xlsx"), self.handle_document_upload))
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
             app.add_handler(CallbackQueryHandler(self.handle_callback_query))
             
