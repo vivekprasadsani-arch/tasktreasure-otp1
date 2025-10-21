@@ -325,23 +325,27 @@ class SimpleRequestsOTPBot:
             return []
     
     def extract_otp_data(self, message_data: Dict) -> Optional[Dict]:
-        """Extract OTP from message - improved pattern matching"""
+        """Extract OTP from message - handles hyphenated codes like 752-637"""
         try:
             message = message_data['message']
             
             # Priority OTP patterns (check these first)
             priority_patterns = [
-                r'(?:code|otp|pin|verification|verify)[\s:]+(\d{4,8})',  # "code: 1234"
+                # Handle hyphenated codes: "752-637", "466-388"
+                r'(?:code|otp|pin|verification|verify)[\s:#]*(\d{3,4}[-\s]\d{3,4})',  # "code 752-637"
+                r'(?:code|otp|pin|verification|verify)[\s:#]*(\d{4,8})',  # "code 1234"
+                r'(\d{3,4}[-\s]\d{3,4})',  # standalone "752-637"
                 r'(\d{4,8})[\s]+(?:is your|est votre|is the|sera)',  # "1234 is your code"
-                r'(?:your|votre)[\s]+(?:code|otp|pin)[\s:]+(\d{4,8})',  # "your code 1234"
+                r'(?:your|votre)[\s]+(?:code|otp|pin)[\s:#]*(\d{3,4}[-\s]\d{3,4})',  # "your code 752-637"
+                r'(?:your|votre)[\s]+(?:code|otp|pin)[\s:#]*(\d{4,8})',  # "your code 1234"
             ]
             
             # Try priority patterns first
             for pattern in priority_patterns:
                 match = re.search(pattern, message, re.IGNORECASE)
                 if match:
-                    otp_code = match.group(1)
-                    logger.info(f"✅ OTP extracted (priority): {otp_code} from message: {message[:50]}...")
+                    otp_code = match.group(1).replace('-', '').replace(' ', '')  # Remove hyphen/spaces
+                    logger.info(f"✅ OTP extracted: {otp_code} from: {message[:80]}...")
                     return {
                         'otp_code': otp_code,
                         'service': message_data['service'],
@@ -354,7 +358,7 @@ class SimpleRequestsOTPBot:
             fallback_match = re.search(r'\b(\d{4,8})\b', message)
             if fallback_match:
                 otp_code = fallback_match.group(1)
-                logger.info(f"✅ OTP extracted (fallback): {otp_code} from message: {message[:50]}...")
+                logger.info(f"✅ OTP extracted (fallback): {otp_code} from: {message[:80]}...")
                 return {
                     'otp_code': otp_code,
                     'service': message_data['service'],
@@ -364,7 +368,7 @@ class SimpleRequestsOTPBot:
                 }
             
             # No OTP found
-            logger.debug(f"❌ No OTP pattern matched in: {message[:50]}...")
+            logger.warning(f"❌ No OTP pattern matched in: {message[:80]}...")
             return None
             
         except Exception as e:
