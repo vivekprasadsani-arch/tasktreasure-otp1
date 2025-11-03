@@ -45,11 +45,10 @@ except ImportError:
 
 class OTPTelegramBot:
     def __init__(self):
-        # Website credentials and URLs
-        self.username = "ridoyrana32"
-        self.password = "Animex@2024"
-        self.login_url = "http://109.236.84.81/ints/login"
-        self.sms_url = "http://109.236.84.81/ints/agent/SMSCDRStats"
+        self.username = "Roni_dada"
+        self.password = "Roni_dada"
+        self.login_url = "http://94.23.120.156/ints/login"
+        self.sms_url = "http://94.23.120.156/ints/client/SMSCDRStats"
         
         # Telegram Bot credentials from environment
         self.bot_token = os.getenv('BOT_TOKEN')
